@@ -132,6 +132,7 @@ func (W _guthib_com_variadic_Variadic) Call(method string, args ...[]interface{}
 package generic
 
 import (
+	"github.com/traefik/yaegi/interp"
 	"guthib.com/generic"
 	"reflect"
 )
@@ -139,7 +140,7 @@ import (
 func init() {
 	Symbols["guthib.com/generic/generic"] = map[string]reflect.Value{
 		// function, constant and variable definitions
-		"Hello": reflect.ValueOf("func Hello[T comparable](v T) *T {\n\treturn &v\n}"),
+		"Hello": reflect.ValueOf(interp.GenericFunc("func Hello[T comparable](v T) *T {\n\treturn &v\n}")),
 	}
 }
 `[1:],

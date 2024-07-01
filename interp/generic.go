@@ -5,6 +5,13 @@ import (
 	"sync/atomic"
 )
 
+// GenericFunc contains the code of a generic function.
+// This is used in the `yaegi extract` command to represent generic functions
+// instead of the actual value of the function, since you cannot get the
+// [reflect.Value] of a generic function. This is then used to interpret the
+// function when it is imported in yaegi.
+type GenericFunc string
+
 // adot produces an AST dot(1) directed acyclic graph for the given node. For debugging only.
 // func (n *node) adot() { n.astDot(dotWriter(n.interp.dotCmd), n.ident) }
 

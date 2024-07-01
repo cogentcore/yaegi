@@ -216,7 +216,8 @@ func (e *Extractor) genContent(importPath string, p *types.Package, fset *token.
 				if err != nil {
 					return nil, err
 				}
-				val[name] = Val{fmt.Sprintf("%q", b), false}
+				val[name] = Val{fmt.Sprintf("interp.GenericFunc(%q)", b), false}
+				imports["github.com/traefik/yaegi/interp"] = true
 				continue
 			}
 			val[name] = Val{pname, false}
