@@ -44,14 +44,14 @@ func TestGenericFuncComplex(t *testing.T) {
 	i := New(Options{})
 	err := i.Use(Exports{
 		"guthib.com/generic/generic": map[string]reflect.Value{
-			"Hello": reflect.ValueOf(GenericFunc("func Hello[T comparable, F any](v T, f func(*T) *F) *T {\n\treturn &v\n}")),
+			"Hello": reflect.ValueOf(GenericFunc("func Hello[T comparable, F any](v T, f func(a T) F) *T {\n\treturn &v\n}")),
 		},
 	})
 	if err != nil {
 		t.Error(err)
 	}
 	i.ImportUsed()
-	res, err := i.Eval("generic.Hello(3)")
+	res, err := i.Eval("generic.Hello(3, func(a int) bool { return true })")
 	if err != nil {
 		t.Error(err)
 	}
