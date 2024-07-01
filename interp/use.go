@@ -130,6 +130,13 @@ func (interp *Interpreter) Use(values Exports) error {
 		}
 
 		for s, sym := range v {
+			if gf, ok := sym.Interface().(GenericFunc); ok {
+				v, err := interp.eval(string(gf), k, true)
+				if err != nil {
+					return err
+				}
+				sym = v
+			}
 			interp.binPkg[importPath][s] = sym
 		}
 		if k == selfPath {
