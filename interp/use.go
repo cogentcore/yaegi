@@ -130,18 +130,23 @@ func (interp *Interpreter) Use(values Exports) error {
 		}
 
 		for s, sym := range v {
+			interp.binPkg[importPath][s] = sym
+		}
+		if k == selfPath {
+			interp.binPkg[importPath]["Self"] = reflect.ValueOf(interp)
+		}
+	}
+
+	for k, v := range values {
+		packageName := path.Base(k)
+		for _, sym := range v {
 			if gf, ok := sym.Interface().(GenericFunc); ok {
 				str := "package " + packageName + "\n" + string(gf)
 				_, err := interp.Eval(str)
 				if err != nil {
 					return err
 				}
-				continue // we do not add it as a normal import symbol
 			}
-			interp.binPkg[importPath][s] = sym
-		}
-		if k == selfPath {
-			interp.binPkg[importPath]["Self"] = reflect.ValueOf(interp)
 		}
 	}
 
