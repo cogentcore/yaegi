@@ -201,8 +201,10 @@ func (e *Extractor) genContent(importPath string, p *types.Package) ([]byte, err
 				val[name] = Val{pname, false}
 			}
 		case *types.Func:
-			// Skip generic functions and methods.
+			// Generic functions and methods must be extracted as code that
+			// can be interpreted, since they cannot be compiled in.
 			if s := o.Type().(*types.Signature); s.TypeParams().Len() > 0 || s.RecvTypeParams().Len() > 0 {
+				val[name] = Val{`"` + o.String() + `"`, false}
 				continue
 			}
 			val[name] = Val{pname, false}
