@@ -142,8 +142,7 @@ func (interp *Interpreter) Use(values Exports) error {
 		for _, sym := range v {
 			if gf, ok := sym.Interface().(GenericFunc); ok {
 				str := "package " + packageName + "\n" + string(gf)
-				_, err := interp.Eval(str)
-				if err != nil {
+				if _, err := interp.Compile(str); err != nil {
 					return err
 				}
 			}
