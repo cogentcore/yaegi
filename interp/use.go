@@ -131,10 +131,12 @@ func (interp *Interpreter) Use(values Exports) error {
 
 		for s, sym := range v {
 			if gf, ok := sym.Interface().(GenericFunc); ok {
-				_, err := interp.eval(string(gf), k, true)
+				str := "package " + packageName + "\n" + string(gf)
+				_, err := interp.Eval(str)
 				if err != nil {
 					return err
 				}
+				continue // we do not add it as a normal import symbol
 			}
 			interp.binPkg[importPath][s] = sym
 		}

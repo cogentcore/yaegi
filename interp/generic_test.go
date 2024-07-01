@@ -16,7 +16,7 @@ func TestGenericFunc(t *testing.T) {
 		t.Error(err)
 	}
 	i.ImportUsed()
-	res, err := i.Eval("Hello(3)")
+	res, err := i.Eval("generic.Hello(3)")
 	if err != nil {
 		t.Error(err)
 	}
