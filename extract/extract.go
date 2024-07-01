@@ -205,8 +205,12 @@ func (e *Extractor) genContent(importPath string, p *types.Package, fset *token.
 			// can be interpreted, since they cannot be compiled in.
 			if s := o.Type().(*types.Signature); s.TypeParams().Len() > 0 || s.RecvTypeParams().Len() > 0 {
 				scope := o.Scope()
-				start, end := scope.Pos()-1, scope.End()-1
+				start, end := scope.Pos(), scope.End()
 				ff := fset.File(start)
+				base := token.Pos(ff.Base())
+				start -= base
+				end -= base
+
 				f, err := os.Open(ff.Name())
 				if err != nil {
 					return nil, err
