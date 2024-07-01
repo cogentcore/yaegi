@@ -141,7 +141,7 @@ type Extractor struct {
 	Tag     []string // Comma separated of build tags to be added to the created package.
 }
 
-func (e *Extractor) genContent(importPath string, p *types.Package) ([]byte, error) {
+func (e *Extractor) genContent(importPath string, p *types.Package, fset *token.FileSet) ([]byte, error) {
 	prefix := "_" + importPath + "_"
 	prefix = strings.NewReplacer("/", "_", "-", "_", ".", "_", "~", "_").Replace(prefix)
 
@@ -204,7 +204,19 @@ func (e *Extractor) genContent(importPath string, p *types.Package) ([]byte, err
 			// Generic functions and methods must be extracted as code that
 			// can be interpreted, since they cannot be compiled in.
 			if s := o.Type().(*types.Signature); s.TypeParams().Len() > 0 || s.RecvTypeParams().Len() > 0 {
-				val[name] = Val{`"` + o.String() + `"`, false}
+				scope := o.Scope()
+				start, end := scope.Pos()-1, scope.End()-1
+				ff := fset.File(start)
+				f, err := os.Open(ff.Name())
+				if err != nil {
+					return nil, err
+				}
+				b := make([]byte, end-start)
+				_, err = f.ReadAt(b, int64(start))
+				if err != nil {
+					return nil, err
+				}
+				val[name] = Val{fmt.Sprintf("%q", b), false}
 				continue
 			}
 			val[name] = Val{pname, false}
@@ -449,12 +461,13 @@ func (e *Extractor) Extract(pkgIdent, importPath string, rw io.Writer) (string, 
 		return "", err
 	}
 
-	pkg, err := importer.ForCompiler(token.NewFileSet(), "source", nil).Import(pkgIdent)
+	fset := token.NewFileSet()
+	pkg, err := importer.ForCompiler(fset, "source", nil).Import(pkgIdent)
 	if err != nil {
 		return "", err
 	}
 
-	content, err := e.genContent(ipp, pkg)
+	content, err := e.genContent(ipp, pkg, fset)
 	if err != nil {
 		return "", err
 	}

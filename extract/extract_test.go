@@ -139,7 +139,7 @@ import (
 func init() {
 	Symbols["guthib.com/generic/generic"] = map[string]reflect.Value{
 		// function, constant and variable definitions
-		"Hello": reflect.ValueOf("func ../generic.Hello[T comparable](v T) *T"),
+		"Hello": reflect.ValueOf("func Hello[T comparable](v T) *T {\n\treturn &v\n}"),
 	}
 }
 `[1:],
