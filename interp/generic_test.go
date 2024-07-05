@@ -20,7 +20,7 @@ func TestGenericFuncDeclare(t *testing.T) {
 	}
 }
 
-func TestGenericFunc(t *testing.T) {
+func TestGenericFuncBasic(t *testing.T) {
 	i := New(Options{})
 	err := i.Use(Exports{
 		"guthib.com/generic/generic": map[string]reflect.Value{
@@ -30,13 +30,50 @@ func TestGenericFunc(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	i.ImportUsed()
 	res, err := i.Eval("generic.Hello(3)")
 	if err != nil {
 		t.Error(err)
 	}
 	if res.Elem().Interface() != 3 {
 		t.Error("expected &(3), got", res)
+	}
+}
+
+func TestGenericFuncNoDotImport(t *testing.T) {
+	i := New(Options{})
+	err := i.Use(Exports{
+		"guthib.com/generic/generic": map[string]reflect.Value{
+			"Hello": reflect.ValueOf(GenericFunc("func Hello[T comparable](v T) *T {\n\treturn &v\n}")),
+		},
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = i.Eval(`
+import "guthib.com/generic"
+func main() { generic.Hello(3) }
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGenericFuncDotImport(t *testing.T) {
+	i := New(Options{})
+	err := i.Use(Exports{
+		"guthib.com/generic/generic": map[string]reflect.Value{
+			"Hello": reflect.ValueOf(GenericFunc("func Hello[T comparable](v T) *T {\n\treturn &v\n}")),
+		},
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = i.Eval(`
+import . "guthib.com/generic"
+func main() { Hello(3) }
+`)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
@@ -62,6 +99,45 @@ func TestGenericFuncComplex(t *testing.T) {
 	}
 	if !done {
 		t.Error("!done")
+	}
+}
+
+func TestGenericCallTwice(t *testing.T) {
+	i := New(Options{})
+	_, err := i.Eval(`
+func Do[T any](v T) { println(v) }
+func Hello[T any](v T) { Do(v) }
+func main() { Hello[int](3) }
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestGenericFuncTwice(t *testing.T) {
+	i := New(Options{})
+	err := i.Use(Exports{
+		"guthib.com/generic/generic": map[string]reflect.Value{
+			"Do": reflect.ValueOf(GenericFunc("func Do[T any](v T) { println(v) }")),
+		},
+	})
+	// i.ImportUsed()
+	// err = i.Use(Exports{
+	// 	"guthib.com/generic/generic": map[string]reflect.Value{
+	// 		"Hello": reflect.ValueOf(GenericFunc("import . \"guthib.com/generic\"\nfunc Hello[T any](v T) { Do[T](v) }")),
+	// 	},
+	// })
+	// i.ImportUsed()
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = i.Eval(`
+import . "guthib.com/generic"
+func Hello[T any](v T) { Do[T](v) }
+func main() { Hello[int](3) }
+`)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
