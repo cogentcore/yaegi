@@ -43,7 +43,7 @@ func TestGenericFuncNoDotImport(t *testing.T) {
 	i := New(Options{})
 	err := i.Use(Exports{
 		"guthib.com/generic/generic": map[string]reflect.Value{
-			"Hello": reflect.ValueOf(GenericFunc("func Hello[T comparable](v T) *T {\n\treturn &v\n}")),
+			"Hello": reflect.ValueOf(GenericFunc("func Hello[T any](v T) { println(v) }")),
 		},
 	})
 	if err != nil {
@@ -62,7 +62,7 @@ func TestGenericFuncDotImport(t *testing.T) {
 	i := New(Options{})
 	err := i.Use(Exports{
 		"guthib.com/generic/generic": map[string]reflect.Value{
-			"Hello": reflect.ValueOf(GenericFunc("func Hello[T comparable](v T) *T {\n\treturn &v\n}")),
+			"Hello": reflect.ValueOf(GenericFunc("func Hello[T any](v T) { println(v) }")),
 		},
 	})
 	if err != nil {
@@ -83,7 +83,7 @@ func TestGenericFuncComplex(t *testing.T) {
 	err := i.Use(Exports{
 		"guthib.com/generic/generic": map[string]reflect.Value{
 			"Do":    reflect.ValueOf(func() { done = true }),
-			"Hello": reflect.ValueOf(GenericFunc("import . \"guthib.com/generic\"\nfunc Hello[T comparable, F any](v T, f func(a T) F) *T {\n\tDo(); return &v\n}")),
+			"Hello": reflect.ValueOf(GenericFunc("func Hello[T comparable, F any](v T, f func(a T) F) *T {\n\tDo(); return &v\n}")),
 		},
 	})
 	i.ImportUsed()
@@ -118,23 +118,16 @@ func TestGenericFuncTwice(t *testing.T) {
 	i := New(Options{})
 	err := i.Use(Exports{
 		"guthib.com/generic/generic": map[string]reflect.Value{
-			"Do": reflect.ValueOf(GenericFunc("func Do[T any](v T) { println(v) }")),
+			"Do":    reflect.ValueOf(GenericFunc("func Do[T any](v T) { println(v) }")),
+			"Hello": reflect.ValueOf(GenericFunc("func Hello[T any](v T) { Do(v) }")),
 		},
 	})
-	// i.ImportUsed()
-	// err = i.Use(Exports{
-	// 	"guthib.com/generic/generic": map[string]reflect.Value{
-	// 		"Hello": reflect.ValueOf(GenericFunc("import . \"guthib.com/generic\"\nfunc Hello[T any](v T) { Do[T](v) }")),
-	// 	},
-	// })
-	// i.ImportUsed()
+	i.ImportUsed()
 	if err != nil {
 		t.Error(err)
 	}
 	_, err = i.Eval(`
-import . "guthib.com/generic"
-func Hello[T any](v T) { Do[T](v) }
-func main() { Hello[int](3) }
+func main() { generic.Hello[int](3) }
 `)
 	if err != nil {
 		t.Error(err)

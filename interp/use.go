@@ -139,13 +139,13 @@ func (interp *Interpreter) Use(values Exports) error {
 
 	for k, v := range values {
 		packageName := path.Base(k)
-		for n, sym := range v {
+		for _, sym := range v {
 			if gf, ok := sym.Interface().(GenericFunc); ok {
-				fmt.Println(n)
 				str := fmt.Sprintf("package %s\nimport . %q\n%s", packageName, path.Dir(k), string(gf))
 				if _, err := interp.Compile(str); err != nil {
 					return err
 				}
+				// delete(v, n)
 			}
 		}
 	}
