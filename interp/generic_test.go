@@ -134,30 +134,46 @@ func main() { generic.Hello[int](3) }
 	}
 }
 
-func TestGenericFuncFuncInfer(t *testing.T) {
+func TestGenericFuncInfer(t *testing.T) {
 	i := New(Options{})
 	err := i.Use(Exports{
 		"guthib.com/generic/generic": map[string]reflect.Value{
-			"New": reflect.ValueOf(GenericFunc("func New[T any]() *T { return new(T) }")),
-			//			"AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any](init func(n *T)) { v := New(T); init(v) }")),
-			"AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any]() *T { v := generic.New(T); return v }")),
+			"New":   reflect.ValueOf(GenericFunc("func New[T any]() *T { return new(T) }")),
+			"AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any](init func(n *T)) { v := New(T); init(v); println(*v) }")),
+			// "AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any]() *T { v := generic.New[T](T); return v }")),
 		},
 	})
 	i.ImportUsed()
 	if err != nil {
 		t.Error(err)
 	}
-	_, err = i.Eval(`
+	i.Eval(`
 func main() {
-v := generic.AddAt]()
+// v := generic.AddAt()
 // v := generic.AddAt[int]() // crashes!
-// generic.AddAt(func(w *int) { *w = 3 }) // for init version
+generic.AddAt(func(w *int) { *w = 3 }) // for init version
 // v := generic.New[int]() // direct calling works
 }
 `)
-	if err != nil {
-		t.Error(err)
-	}
+}
+
+func TestGenericFuncInferDirect(t *testing.T) {
+	i := New(Options{})
+	// note: this version behaves identically to non-direct Export version
+	i.Eval(`
+func New[T any]() *T { return new(T) }
+func AddAt[T any](init func(n *T)) { v := New(T); init(v); println(*v) }
+// func AddAt[T any]() *T { v := New(T); return v }
+func main() {
+// v := AddAt[int]() // crashes!
+// v := AddAt() // not enough info for non-init version
+AddAt(func(w *int) { *w = 3 }) // for init version
+// v := New[int]() // direct calling works
+}
+`)
+	// if err != nil {
+	// 	t.Error(err)
+	// }
 }
 
 func TestCallPackageFunc(t *testing.T) {

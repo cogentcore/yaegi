@@ -71,10 +71,6 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 				for _, c := range n.child {
 					l := len(c.child) - 1
 					for _, cc := range c.child[:l] {
-						if pindex >= len(types) {
-							// debug.PrintStack()
-							return nil, cc.cfgErrorf("undefined type for %s, pindex: %d types: %#v", cc.ident, pindex, types)
-						}
 						t, err := nodeType(c.interp, sc, c.child[l])
 						if err != nil {
 							return nil, err
@@ -162,7 +158,6 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		return nod, true, nil
 	}
 
-	fmt.Println("genAST:", sname)
 	r, err := gtree(root, root.anc)
 	if err != nil {
 		return nil, false, err
