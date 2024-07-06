@@ -493,7 +493,8 @@ func (e *Extractor) Extract(pkgIdent, importPath string, rw io.Writer) (string, 
 			// Our path must point back to ourself here.
 			pkgIdent = filepath.Join("..", filepath.Base(pkgIdent))
 		}
-		pkgs, err := packages.Load(&packages.Config{Mode: packages.NeedTypes}, pkgIdent)
+		// NeedsSyntax is needed for getting the scopes of generic functions.
+		pkgs, err := packages.Load(&packages.Config{Mode: packages.NeedTypes | packages.NeedSyntax}, pkgIdent)
 		if err != nil {
 			return "", err
 		}
