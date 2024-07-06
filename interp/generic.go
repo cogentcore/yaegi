@@ -1,7 +1,6 @@
 package interp
 
 import (
-	"fmt"
 	"strings"
 	"sync/atomic"
 )
@@ -29,8 +28,14 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		sname += t.id() + ","
 	}
 	sname = strings.TrimSuffix(sname, ",") + "]"
+	if trace {
+		tracePrintln(root, "genAST", sname)
+	}
 
 	gtree = func(n, anc *node) (*node, error) {
+		if trace {
+			tracePrintln(n, n)
+		}
 		nod := copyNode(n, anc, false)
 		switch n.kind {
 		case funcDecl, funcType:
@@ -38,21 +43,27 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 
 		case callExpr:
 			c0 := n.child[0]
-			if c0.kind != indexListExpr { // not a generic call
+			if c0.kind != indexExpr {
 				break
 			}
-			fun := c0.child[0].sym.node
+			tracePrintTree(n, "generic start")
+			fun := c0
 			lt := []*itype{}
 			for _, c := range c0.child[1:] {
-				lt = append(lt, c.typ)
+				sym, _, _ := sc.lookup(c.ident)
+				c.typ = sym.typ
+				tracePrintln(c, c, "type", c.typ, "sym", sym, sym.typ)
+				lt = append(lt, sym.typ)
 			}
-			fmt.Println("recursive gen:", fun.ident, lt)
+			c0.typ = lt[0]
+			tracePrintln(c0, "recursive gen:", fun.ident, lt)
 			g, found, err := genAST(sc, fun, lt)
-			if !found || err != nil {
-				fmt.Println("rgen failed:", found, err)
+			if err != nil {
+				tracePrintln(c0, "rgen failed:", found, err)
 				break
 			}
 			n.child[0] = g
+			break
 
 		case identExpr:
 			// Replace generic type by instantiated one.
@@ -169,6 +180,9 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 	}
 
 	if nod, found := root.interp.generic[sname]; found {
+		if trace {
+			tracePrintln(root, "found compiled version")
+		}
 		return nod, true, nil
 	}
 
@@ -195,6 +209,9 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		nod.child = nil
 	}
 	// r.adot() // Used for debugging only.
+	if trace {
+		tracePrintln(root, "genAST", sname, "done")
+	}
 	return r, false, nil
 }
 

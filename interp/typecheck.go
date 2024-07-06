@@ -970,6 +970,10 @@ func (check typecheck) arguments(n *node, child []*node, fun *node, ellipsis boo
 	var cnt int
 	for i, param := range params {
 		ellip := i == l-1 && ellipsis
+		if fun.typ == nil {
+			tracePrintln(fun, fun, "nil fun type")
+			break
+		}
 		if err := check.argument(param, fun.typ, cnt, l, ellip); err != nil {
 			return err
 		}

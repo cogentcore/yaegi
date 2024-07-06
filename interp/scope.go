@@ -57,6 +57,17 @@ type symbol struct {
 	global  bool          // true if symbol is defined in global space
 }
 
+func (sy *symbol) String() string {
+	s := sy.kind.String()
+	if sy.typ != nil {
+		s += " (" + sy.typ.String() + ")"
+	}
+	if sy.rval.IsValid() {
+		s += " = " + sy.rval.String()
+	}
+	return s
+}
+
 // scope type stores symbols in maps, and frame layout as array of types
 // The purposes of scopes are to manage the visibility of each symbol
 // and to store the memory frame layout information (type and index in frame)

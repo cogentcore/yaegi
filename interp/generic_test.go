@@ -8,7 +8,7 @@ func TestGenericRecursive(t *testing.T) {
 	i := New(Options{})
 	_, err := i.Eval(`
 func New[T any]() *T { return new(T) }
-func Add[T any]() *T { return New(T) }
+func Add[T any]() *T { return New[int](T) }
 
 func main() {
 	v := Add[int]() // crashes!
