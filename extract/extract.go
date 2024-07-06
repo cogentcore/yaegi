@@ -220,6 +220,10 @@ func (e *Extractor) genContent(importPath string, p *types.Package, fset *token.
 				if err != nil {
 					return nil, err
 				}
+				// only add if we have a //yaegi:add directive
+				if !bytes.Contains(b, []byte(`//yaegi:add`)) {
+					continue
+				}
 				val[name] = Val{fmt.Sprintf("interp.GenericFunc(%q)", b), false}
 				imports["github.com/traefik/yaegi/interp"] = true
 				continue
