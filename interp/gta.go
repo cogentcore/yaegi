@@ -1,8 +1,10 @@
 package interp
 
 import (
+	"fmt"
 	"path"
 	"path/filepath"
+	"strings"
 )
 
 // gta performs a global types analysis on the AST, registering types,
@@ -242,9 +244,13 @@ func (interp *Interpreter) gta(root *node, rpath, importPath, pkgName string) ([
 							kind = typeSym
 						}
 						if gf, ok := v.Interface().(GenericFunc); ok {
-							if _, cerr := interp.Compile(string(gf)); cerr != nil {
-								err = cerr
-								return false
+							samePath := strings.HasSuffix(ipath, importPath)
+							if !samePath {
+								fmt.Println("compiling:", n, "from:", ipath, "into:", importPath, "samePath:", samePath)
+								if _, cerr := interp.Compile(string(gf)); cerr != nil {
+									err = cerr
+									return false
+								}
 							}
 						} else {
 							sc.sym[n] = &symbol{kind: kind, typ: valueTOf(typ, withScope(sc)), rval: v}
