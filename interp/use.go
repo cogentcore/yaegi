@@ -145,7 +145,6 @@ func (interp *Interpreter) Use(values Exports) error {
 				if _, err := interp.Compile(str); err != nil {
 					return err
 				}
-				// delete(v, n)
 			}
 		}
 	}

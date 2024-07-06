@@ -134,6 +134,32 @@ func main() { generic.Hello[int](3) }
 	}
 }
 
+func TestGenericFuncFuncInfer(t *testing.T) {
+	i := New(Options{})
+	err := i.Use(Exports{
+		"guthib.com/generic/generic": map[string]reflect.Value{
+			"New": reflect.ValueOf(GenericFunc("func New[T any]() *T { return new(T) }")),
+			//			"AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any](init func(n *T)) { v := New(T); init(v) }")),
+			"AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any]() *T { v := generic.New(T); return v }")),
+		},
+	})
+	i.ImportUsed()
+	if err != nil {
+		t.Error(err)
+	}
+	_, err = i.Eval(`
+func main() {
+v := generic.AddAt]()
+// v := generic.AddAt[int]() // crashes!
+// generic.AddAt(func(w *int) { *w = 3 }) // for init version
+// v := generic.New[int]() // direct calling works
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestCallPackageFunc(t *testing.T) {
 	i := New(Options{})
 	done := false

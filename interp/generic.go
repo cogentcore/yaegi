@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"fmt"
 	"strings"
 	"sync/atomic"
 )
@@ -71,7 +72,8 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 					l := len(c.child) - 1
 					for _, cc := range c.child[:l] {
 						if pindex >= len(types) {
-							return nil, cc.cfgErrorf("undefined type for %s", cc.ident)
+							// debug.PrintStack()
+							return nil, cc.cfgErrorf("undefined type for %s, pindex: %d types: %#v", cc.ident, pindex, types)
 						}
 						t, err := nodeType(c.interp, sc, c.child[l])
 						if err != nil {
@@ -160,6 +162,7 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		return nod, true, nil
 	}
 
+	fmt.Println("genAST:", sname)
 	r, err := gtree(root, root.anc)
 	if err != nil {
 		return nil, false, err
@@ -297,6 +300,10 @@ func inferTypesFromCall(sc *scope, fun *node, args []*node) ([]*itype, error) {
 		typ, err := nodeType(fun.interp, sc, c.lastChild())
 		if err != nil {
 			return nil, err
+		}
+		if i >= len(args) {
+			fmt.Println("generic functions do not yet support variadic args")
+			return nil, nil
 		}
 		lt, err := inferTypes(typ, args[i].typ)
 		if err != nil {
