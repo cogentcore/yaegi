@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"fmt"
 	"strings"
 	"sync/atomic"
 )
@@ -34,6 +35,24 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		switch n.kind {
 		case funcDecl, funcType:
 			nod.val = nod
+
+		case callExpr:
+			c0 := n.child[0]
+			if c0.kind != indexListExpr { // not a generic call
+				break
+			}
+			fun := c0.child[0].sym.node
+			lt := []*itype{}
+			for _, c := range c0.child[1:] {
+				lt = append(lt, c.typ)
+			}
+			fmt.Println("recursive gen:", fun.ident, lt)
+			g, found, err := genAST(sc, fun, lt)
+			if !found || err != nil {
+				fmt.Println("rgen failed:", found, err)
+				break
+			}
+			n.child[0] = g
 
 		case identExpr:
 			// Replace generic type by instantiated one.
