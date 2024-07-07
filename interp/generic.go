@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"fmt"
 	"strings"
 	"sync/atomic"
 )
@@ -41,6 +42,7 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		case funcDecl, funcType:
 			nod.val = nod
 
+		/*  todo: this is not path that gets hit in cfg for fun[int]() -- come back to it
 		case callExpr:
 			c0 := n.child[0]
 			if c0.kind != indexExpr {
@@ -67,6 +69,7 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 				g.typ = lt[0] // todo: what is actual type here?
 			}
 			return g, nil
+		*/
 
 		case identExpr:
 			// Replace generic type by instantiated one.
@@ -78,16 +81,43 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 			nod.typ = nt.typ
 
 		case indexExpr:
+			tracePrintln(n, n.anc, "in index expr")
 			// Catch a possible recursive generic type definition
-			if root.kind != typeSpec {
+			if root.kind == typeSpec {
+				tracePrintln(root, "root kind == typeSpec")
+				if root.child[0].ident == n.child[0].ident {
+					tracePrintln(root.child[0], "same ident")
+					nod := copyNode(n.child[0], anc, false)
+					fixNodes = append(fixNodes, nod)
+					return nod, nil
+				}
+			}
+			if len(n.child) == 0 || n.child[0].typ == nil {
+				tracePrintln(n, "no c0 with typ")
 				break
 			}
-			if root.child[0].ident != n.child[0].ident {
+			t := n.child[0].typ
+			for t.cat == linkedT {
+				t = t.val
+			}
+			if t.cat != funcT {
 				break
 			}
-			nod := copyNode(n.child[0], anc, false)
-			fixNodes = append(fixNodes, nod)
-			return nod, nil
+			c1 := n.child[1]
+			if !c1.isType(sc) {
+				break
+			}
+			tracePrintln(t.node.anc, "generic genAST indexed funcT")
+			g, _, err := genAST(sc, t.node.anc, []*itype{c1.typ})
+			if err != nil {
+				tracePrintln(g, "error", err)
+				return n, err
+			}
+			// Replace generic func node by instantiated one.
+			n.anc.child[childPos(n)] = g
+			n.typ = g.typ
+			tracePrintln(n, g, "gen type", g.typ, "par", n.anc, fmt.Sprintf("n: %p  g: %p par: %p", n, g, n.anc))
+			return n, nil
 
 		case fieldList:
 			//  Node is the type parameters list of a generic function.
