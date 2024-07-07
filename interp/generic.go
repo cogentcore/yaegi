@@ -35,7 +35,6 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		sname += t.id() + ","
 	}
 	sname = strings.TrimSuffix(sname, ",") + "]"
-	tracePrintTree(root, "genAST", sname)
 
 	gtree = func(n, anc *node) (*node, error) {
 		nod := copyNode(n, anc, false)
@@ -154,9 +153,6 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 	}
 
 	if nod, found := root.interp.generic[sname]; found {
-		if trace {
-			tracePrintln(root, "found compiled version")
-		}
 		return nod, true, nil
 	}
 
@@ -183,9 +179,6 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		nod.child = nil
 	}
 	// r.adot() // Used for debugging only.
-	if trace {
-		tracePrintln(r, "genAST", sname, "done")
-	}
 	return r, false, nil
 }
 
@@ -229,22 +222,17 @@ func inferTypesFromCall(sc *scope, fun *node, args []*node) ([]*itype, error) {
 		}
 		for _, cc := range c.child[:len(c.child)-1] {
 			paramTypes[cc.ident] = typ
-			tracePrintln(ftn, "infer types paramTypes", cc, typ)
 		}
 	}
 
 	var inferTypes func(*itype, *itype) ([]*itype, error)
 	inferTypes = func(param, input *itype) ([]*itype, error) {
-		tracePrintln(ftn, "infer param:", param, "cat:", param.cat, "input:", input)
 		switch param.cat {
 		case chanT, ptrT, sliceT:
 			return inferTypes(param.val, input.val)
 
 		case valueT:
-			tracePrintln(ftn, "valueT", param.name, paramTypes[param.name])
-			// if paramTypes[param.name] != nil {
 			return []*itype{input}, nil
-			// }
 
 		case mapT:
 			k, err := inferTypes(param.key, input.key)
@@ -306,12 +294,9 @@ func inferTypesFromCall(sc *scope, fun *node, args []*node) ([]*itype, error) {
 	types := []*itype{}
 	if len(args) == 0 {
 		err := ftn.cfgErrorf("generic function type infer: no args")
-		tracePrintln(ftn, err)
 		return types, err
 	}
 	var kids []*node
-	tracePrintTree(ftn, "ftn")
-	tracePrintln(ftn, "child[1]", ftn.child[1], len(ftn.child[1].child), "child[0]", ftn.child[0].child[0], len(ftn.child[0].child[0].child))
 	if len(ftn.child[1].child) == 0 && len(ftn.child[0].child[0].child) > 1 {
 		kids = ftn.child[0].child // if no args, use type parameters
 	} else {
@@ -324,9 +309,7 @@ func inferTypesFromCall(sc *scope, fun *node, args []*node) ([]*itype, error) {
 
 	for i, c := range kids {
 		typ, err := nodeType(fun.interp, sc, c.lastChild())
-		tracePrintln(c, "typ:", typ, "lastchild:", c.lastChild())
 		if err != nil {
-			tracePrintln(c, "err:", err)
 			return nil, err
 		}
 		if i >= len(args) {

@@ -388,7 +388,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						lt = append(lt, t1)
 					}
 					var g *node
-					tracePrintln(t0.node.anc, "genAST lit expr")
 					g, _, err = genAST(sc, t0.node.anc, lt)
 					if err != nil {
 						interp.abortErr = err
@@ -402,7 +401,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					}
 					// Generate methods if any.
 					for _, nod := range t0.method {
-						tracePrintln(nod, "genAST methods")
 						gm, _, err2 := genAST(nod.scope, nod, lt)
 						if err2 != nil {
 							err = err2
@@ -996,18 +994,14 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					n.typ = t
 					return
 				}
-				tracePrintln(t.node.anc, "genAST indexed funcT")
 				g, found, err := genAST(sc, t.node.anc, []*itype{c1.typ})
 				if err != nil {
-					tracePrintln(g, "error", err)
 					return
 				}
 				if !found {
-					tracePrintTree(g, "not found, cfg")
 					if _, err = interp.cfg(g, t.node.anc.scope, importPath, pkgName); err != nil {
 						return
 					}
-					tracePrintTree(g, "not found, cfg done")
 					// Generate closures for function body.
 					if err = genRun(g.child[3]); err != nil {
 						return
@@ -1016,7 +1010,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				// Replace generic func node by instantiated one.
 				n.anc.child[childPos(n)] = g
 				n.typ = g.typ
-				tracePrintln(n, g, "gen type", g.typ, "par", n.anc, fmt.Sprintf("n: %p  g: %p par: %p", n, g, n.anc))
 				return
 			case genericT:
 				name := t.id() + "[" + n.child[1].typ.id() + "]"
@@ -1158,7 +1151,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				}
 			}
 			wireChild(n)
-			tracePrintln(n, n.child[0], n.child[0].typ, "call switch type", fmt.Sprintf("n: %p  ch: %p", n, n.child[0]))
 			switch c0 := n.child[0]; {
 			case c0.kind == indexListExpr:
 				// Instantiate a generic function then call it.
@@ -1167,7 +1159,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				for _, c := range c0.child[1:] {
 					lt = append(lt, c.typ)
 				}
-				tracePrintln(n, "generic type list")
 				g, found, err := genAST(sc, fun, lt)
 				if err != nil {
 					return
@@ -1257,7 +1248,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					op(n)
 				}
 
-			case c0.isType(sc):
+			case c0.isType(sc) && len(n.child) > 1:
 				// Type conversion expression
 				c1 := n.child[1]
 				switch len(n.child) {
@@ -1355,16 +1346,13 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					}
 					if types, err = inferTypesFromCall(sc, fun, args); err != nil {
 						interp.abortErr = err
-						tracePrintTree(n, "todo: why no args here?")
 						break
 					}
 					if len(types) == 0 {
 						err = interp.abortErrorf(fun, "generic function failed to infer types")
-						tracePrintln(fun, args, err)
 						break
 					}
 					// Generate an instantiated AST from the generic function one.
-					tracePrintln(fun, "genAST isGeneric")
 					if g, found, err = genAST(sc, fun, types); err != nil {
 						interp.abortErr = err
 						break
@@ -2041,6 +2029,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				err = interp.abortErrorf(n, "cannot use _ as value")
 				break
 			}
+
 			switch {
 			case n.anc.kind == defineStmt && len(n.anc.child) == 3 && n.anc.child[1] == n:
 				// pointer type expression in a var definition
@@ -2628,7 +2617,17 @@ func (n *node) isType(sc *scope) bool {
 			return true // Imported source type
 		}
 	case identExpr:
-		return sc.getType(n.ident) != nil
+		sym, _, found := sc.lookup(n.ident)
+		if found && sym.kind == typeSym {
+			return true
+		}
+		if n.typ == nil || n.typ.scope == nil {
+			return false
+		}
+		// note: in case of generic functions, the type might not exist within
+		// the scope where the generic function was defined, so we need to be
+		// a bit more flexible.
+		return n.typ.scope.pkgID != sc.pkgID
 	case indexExpr:
 		// Maybe a generic type.
 		sym, _, ok := sc.lookup(n.child[0].ident)
@@ -2955,7 +2954,7 @@ func setExec(sn *node) {
 			}
 		}
 		if n.gen == nil {
-			tracePrintTree(sn, n, "setExec nil gen")
+			// tracePrintTree(sn, n, "setExec nil gen")
 			n.gen = nop
 		}
 		n.gen(n)

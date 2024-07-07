@@ -138,7 +138,7 @@ func TestGenericFuncInfer(t *testing.T) {
 	err := i.Use(Exports{
 		"guthib.com/generic/generic": map[string]reflect.Value{
 			"New":   reflect.ValueOf(GenericFunc("func New[T any]() *T { return new(T) }")),
-			"AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any](init func(n *T)) { v := New[T](); init(v); println(*v) }")),
+			"AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any](init func(n *T)) { v := New[T](); init(any(v).(*T)); println(*v) }")),
 		},
 	})
 	i.ImportUsed()
