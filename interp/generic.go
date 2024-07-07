@@ -66,7 +66,7 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 
 		case fieldList:
 			//  Node is the type parameters list of a generic function.
-			if root.kind == funcDecl && n.anc == root.child[2] && childPos(n) == 0 {
+			if root.kind == funcDecl && n.anc == root.child[2] && childPos(n) == 0 && len(types) > 0 {
 				// Fill the types lookup table used for type substitution.
 				for _, c := range n.child {
 					l := len(c.child) - 1
