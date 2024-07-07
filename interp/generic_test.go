@@ -188,3 +188,22 @@ func TestCallPackageFunc(t *testing.T) {
 		t.Error("!done")
 	}
 }
+
+func TestGenericFuncVarArg(t *testing.T) {
+	i := New(Options{})
+	_, err := i.Eval(`
+func New[T any](parent ...any) *T {
+ 	n := new(T)
+	for _, p := range parent {
+		println(p)
+	}
+}
+func main() {
+	New[int]()
+	New[string]("happy")
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
