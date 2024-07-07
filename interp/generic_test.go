@@ -23,17 +23,13 @@ func main() {
 }
 
 func TestGenericRecursiveFunc(t *testing.T) {
-	t.Skip("not yet")
 	i := New(Options{})
 	_, err := i.Eval(`
 func New[T any]() *T { return new(T) }
-func Add[T any](init func(n *T)) { v := New(T); init(v); println(*v) }
+func Add[T any](init func(n *T)) { v := New[T](); init(v); println(*v) }
 
 func main() {
-// v := Add[int]() // crashes!
-// v := Add() // not enough info for non-init version
-Add(func(w *int) { *w = 3 }) // for init version
-// v := New[int]() // direct calling works
+	Add(func(w *int) { *w = 3 })
 }
 `)
 	if err != nil {
