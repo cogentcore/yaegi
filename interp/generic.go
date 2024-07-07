@@ -36,12 +36,47 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		sname += t.id() + ","
 	}
 	sname = strings.TrimSuffix(sname, ",") + "]"
+	if trace {
+		tracePrintln(root, "genAST", sname)
+	}
 
 	gtree = func(n, anc *node) (*node, error) {
+		if trace {
+			tracePrintln(n)
+		}
 		nod := copyNode(n, anc, false)
 		switch n.kind {
 		case funcDecl, funcType:
 			nod.val = nod
+
+		/*  todo: this is not path that gets hit in cfg for fun[int]() -- come back to it
+		case callExpr:
+			c0 := n.child[0]
+			if c0.kind != indexExpr {
+				break
+			}
+			fun := c0
+			tracePrintTree(n, n, "generic start", fun)
+			lt := []*itype{}
+			for _, c := range c0.child[1:] {
+				sym, _, _ := sc.lookup(c.ident)
+				c.typ = sym.typ
+				tracePrintln(c, "type", c.typ, "sym", sym, sym.typ)
+				lt = append(lt, sym.typ)
+			}
+			tracePrintln(c0, "recursive gen:", fun.ident, lt)
+			g, found, err := genAST(sc, fun, lt)
+			if err != nil {
+				tracePrintln(c0, "rgen failed:", found, err)
+				break
+			}
+			n.child[0] = g
+			if g.typ == nil {
+				tracePrintln(g, "type is nil, setting to:", lt[0])
+				g.typ = lt[0] // todo: what is actual type here?
+			}
+			return g, nil
+		*/
 
 		case identExpr:
 			// Replace generic type by instantiated one.
@@ -53,16 +88,43 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 			nod.typ = nt.typ
 
 		case indexExpr:
+			tracePrintln(n, n.anc, "in index expr")
 			// Catch a possible recursive generic type definition
-			if root.kind != typeSpec {
+			if root.kind == typeSpec {
+				tracePrintln(root, "root kind == typeSpec")
+				if root.child[0].ident == n.child[0].ident {
+					tracePrintln(root.child[0], "same ident")
+					nod := copyNode(n.child[0], anc, false)
+					fixNodes = append(fixNodes, nod)
+					return nod, nil
+				}
+			}
+			if len(n.child) == 0 || n.child[0].typ == nil {
+				tracePrintln(n, "no c0 with typ")
 				break
 			}
-			if root.child[0].ident != n.child[0].ident {
+			t := n.child[0].typ
+			for t.cat == linkedT {
+				t = t.val
+			}
+			if t.cat != funcT {
 				break
 			}
-			nod := copyNode(n.child[0], anc, false)
-			fixNodes = append(fixNodes, nod)
-			return nod, nil
+			c1 := n.child[1]
+			if !c1.isType(sc) {
+				break
+			}
+			tracePrintln(t.node.anc, "generic genAST indexed funcT")
+			g, _, err := genAST(sc, t.node.anc, []*itype{c1.typ})
+			if err != nil {
+				tracePrintln(g, "error", err)
+				return n, err
+			}
+			// Replace generic func node by instantiated one.
+			n.anc.child[childPos(n)] = g
+			n.typ = g.typ
+			tracePrintln(n, g, "gen type", g.typ, "par", n.anc, fmt.Sprintf("n: %p  g: %p par: %p", n, g, n.anc))
+			return n, nil
 
 		case fieldList:
 			//  Node is the type parameters list of a generic function.
@@ -155,6 +217,9 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 	}
 
 	if nod, found := root.interp.generic[sname]; found {
+		if trace {
+			tracePrintln(root, "found compiled version")
+		}
 		return nod, true, nil
 	}
 
@@ -181,6 +246,9 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		nod.child = nil
 	}
 	// r.adot() // Used for debugging only.
+	if trace {
+		tracePrintln(r, "genAST", sname, "done")
+	}
 	return r, false, nil
 }
 

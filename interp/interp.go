@@ -55,6 +55,26 @@ type node struct {
 	meta       interface{}    // meta stores meta information between gta runs, like errors
 }
 
+func (n *node) String() string {
+	s := n.kind.String()
+	if n.ident != "" {
+		s += " " + n.ident
+	}
+	if n.sym != nil {
+		s += " sym:" + n.sym.String()
+	} else if n.typ != nil {
+		s += " typ:" + n.typ.String()
+	}
+	return s
+}
+
+func (n *node) depth() int {
+	if n.anc != nil {
+		return n.anc.depth() + 1
+	}
+	return 0
+}
+
 func (n *node) shouldBreak() bool {
 	if n == nil || n.debug == nil {
 		return false

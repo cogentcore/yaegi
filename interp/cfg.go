@@ -52,6 +52,25 @@ func init() {
 	constBltn[bltnSizeof] = sizeof
 }
 
+// set trace to true for debugging the cfg and other processes
+var trace = true
+
+func traceIndent(n *node) string {
+	return strings.Repeat("  ", n.depth())
+}
+
+func tracePrintln(n *node, v ...any) {
+	fmt.Println(append([]any{traceIndent(n), n, fmt.Sprintf("%p", n)}, v...)...)
+}
+
+func tracePrintTree(n *node, v ...any) {
+	tracePrintln(n, v...)
+	n.Walk(func(n *node) bool {
+		tracePrintln(n)
+		return true
+	}, nil)
+}
+
 // cfg generates a control flow graph (CFG) from AST (wiring successors in AST)
 // and pre-compute frame sizes and indexes for all un-named (temporary) and named
 // variables. A list of nodes of init functions is returned.
@@ -67,6 +86,10 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 	baseName := filepath.Base(interp.fset.Position(root.pos).Filename)
 
 	root.Walk(func(n *node) bool {
+		if trace {
+			tracePrintln(n)
+		}
+
 		// Pre-order processing
 		if err != nil {
 			return false
@@ -357,6 +380,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						lt = append(lt, t1)
 					}
 					var g *node
+					tracePrintln(t0.node.anc, "genAST lit expr")
 					g, _, err = genAST(sc, t0.node.anc, lt)
 					if err != nil {
 						return false
@@ -368,6 +392,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					}
 					// Generate methods if any.
 					for _, nod := range t0.method {
+						tracePrintln(nod, "genAST methods")
 						gm, _, err2 := genAST(nod.scope, nod, lt)
 						if err2 != nil {
 							err = err2
@@ -950,14 +975,18 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					n.typ = t
 					return
 				}
+				tracePrintln(t.node.anc, "genAST indexed funcT")
 				g, found, err := genAST(sc, t.node.anc, []*itype{c1.typ})
 				if err != nil {
+					tracePrintln(g, "error", err)
 					return
 				}
 				if !found {
+					tracePrintTree(g, "not found, cfg")
 					if _, err = interp.cfg(g, t.node.anc.scope, importPath, pkgName); err != nil {
 						return
 					}
+					tracePrintTree(g, "not found, cfg done")
 					// Generate closures for function body.
 					if err = genRun(g.child[3]); err != nil {
 						return
@@ -966,6 +995,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				// Replace generic func node by instantiated one.
 				n.anc.child[childPos(n)] = g
 				n.typ = g.typ
+				tracePrintln(n, g, "gen type", g.typ, "par", n.anc, fmt.Sprintf("n: %p  g: %p par: %p", n, g, n.anc))
 				return
 			case genericT:
 				name := t.id() + "[" + n.child[1].typ.id() + "]"
@@ -1107,6 +1137,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				}
 			}
 			wireChild(n)
+			tracePrintln(n, n.child[0], n.child[0].typ, "call switch type", fmt.Sprintf("n: %p  ch: %p", n, n.child[0]))
 			switch c0 := n.child[0]; {
 			case c0.kind == indexListExpr:
 				// Instantiate a generic function then call it.
@@ -1115,6 +1146,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				for _, c := range c0.child[1:] {
 					lt = append(lt, c.typ)
 				}
+				tracePrintln(n, "generic type list")
 				g, found, err := genAST(sc, fun, lt)
 				if err != nil {
 					return
@@ -1285,7 +1317,10 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			default:
 				// The call may be on a generic function. In that case, replace the
 				// generic function AST by an instantiated one before going further.
-				if isGeneric(c0.typ) {
+				if c0.typ == nil {
+					tracePrintln(n, c0, "nil type on call")
+					break
+				} else if isGeneric(c0.typ) {
 					fun := c0.typ.node.anc
 					var g *node
 					var types []*itype
@@ -1296,6 +1331,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						break
 					}
 					// Generate an instantiated AST from the generic function one.
+					tracePrintln(fun, "genAST isGeneric")
 					if g, found, err = genAST(sc, fun, types); err != nil {
 						break
 					}
