@@ -34,7 +34,7 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 
 	gtree = func(n, anc *node) (*node, error) {
 		if trace {
-			tracePrintln(n, n)
+			tracePrintln(n)
 		}
 		nod := copyNode(n, anc, false)
 		switch n.kind {
@@ -46,16 +46,15 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 			if c0.kind != indexExpr {
 				break
 			}
-			tracePrintTree(n, "generic start")
 			fun := c0
+			tracePrintTree(n, n, "generic start", fun)
 			lt := []*itype{}
 			for _, c := range c0.child[1:] {
 				sym, _, _ := sc.lookup(c.ident)
 				c.typ = sym.typ
-				tracePrintln(c, c, "type", c.typ, "sym", sym, sym.typ)
+				tracePrintln(c, "type", c.typ, "sym", sym, sym.typ)
 				lt = append(lt, sym.typ)
 			}
-			c0.typ = lt[0]
 			tracePrintln(c0, "recursive gen:", fun.ident, lt)
 			g, found, err := genAST(sc, fun, lt)
 			if err != nil {
@@ -63,7 +62,11 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 				break
 			}
 			n.child[0] = g
-			break
+			if g.typ == nil {
+				tracePrintln(g, "type is nil, setting to:", lt[0])
+				g.typ = lt[0] // todo: what is actual type here?
+			}
+			return g, nil
 
 		case identExpr:
 			// Replace generic type by instantiated one.
@@ -210,7 +213,7 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 	}
 	// r.adot() // Used for debugging only.
 	if trace {
-		tracePrintln(root, "genAST", sname, "done")
+		tracePrintln(r, "genAST", sname, "done")
 	}
 	return r, false, nil
 }
