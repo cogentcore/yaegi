@@ -233,6 +233,7 @@ type Interpreter struct {
 	done     chan struct{}     // for cancellation of channel operations
 	roots    []*node
 	generic  map[string]*node
+	abortErr error // if non-nil, we are aborting on this error
 
 	hooks *hooks // symbol hooks
 
@@ -295,6 +296,12 @@ type Panic struct {
 // fmt.Fprintln(n.interp.stderr, oNode.cfgErrorf("panic")) in runCfg.
 
 func (e Panic) Error() string { return fmt.Sprint(e.Value) }
+
+func (interp *Interpreter) abortErrorf(n *node, msg string, v ...any) error {
+	err := n.cfgErrorf(msg, v...)
+	interp.abortErr = err
+	return err
+}
 
 // Walk traverses AST n in depth first order, call cbin function
 // at node entry and cbout function at node exit.
@@ -571,6 +578,7 @@ func isFile(filesystem fs.FS, path string) bool {
 }
 
 func (interp *Interpreter) eval(src, name string, inc bool) (res reflect.Value, err error) {
+	interp.abortErr = nil
 	prog, err := interp.compileSrc(src, name, inc)
 	if err != nil {
 		return res, err

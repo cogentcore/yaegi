@@ -53,17 +53,23 @@ func init() {
 }
 
 // set trace to true for debugging the cfg and other processes
-var trace = true
+var trace = false
 
 func traceIndent(n *node) string {
 	return strings.Repeat("  ", n.depth())
 }
 
 func tracePrintln(n *node, v ...any) {
+	if !trace {
+		return
+	}
 	fmt.Println(append([]any{traceIndent(n), n, fmt.Sprintf("%p", n)}, v...)...)
 }
 
 func tracePrintTree(n *node, v ...any) {
+	if !trace {
+		return
+	}
 	tracePrintln(n, v...)
 	n.Walk(func(n *node) bool {
 		tracePrintln(n)
@@ -86,14 +92,12 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 	baseName := filepath.Base(interp.fset.Position(root.pos).Filename)
 
 	root.Walk(func(n *node) bool {
-		if trace {
-			tracePrintln(n)
-		}
-
 		// Pre-order processing
-		if err != nil {
+		if err != nil || interp.abortErr != nil {
+			// note: abortErr catches sub-calls that global err misses
 			return false
 		}
+		tracePrintln(n)
 		if n.scope == nil {
 			n.scope = sc
 		}
@@ -118,7 +122,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					break
 				}
 				if dest.typ.incomplete {
-					err = n.cfgErrorf("invalid type declaration")
+					err = interp.abortErrorf(n, "invalid type declaration")
 					return false
 				}
 				if !isInterface(dest.typ) {
@@ -137,6 +141,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			}
 			n.typ, err = nodeType(interp, sc, n.child[n.nleft])
 			if err != nil {
+				interp.abortErr = err
 				break
 			}
 			for i := 0; i < n.nleft; i++ {
@@ -152,7 +157,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				// RangeStmt. The following workaround is less elegant but ok.
 				c := n.anc.child[1]
 				if c != nil && c.typ != nil && isSendChan(c.typ) {
-					err = c.cfgErrorf("invalid operation: range %s receive from send-only channel", c.ident)
+					err = interp.abortErrorf(c, "invalid operation: range %s receive from send-only channel", c.ident)
 					return false
 				}
 
@@ -271,7 +276,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			label := n.child[0].ident
 			if sym, _, ok := sc.lookup(label); ok {
 				if sym.kind != labelSym {
-					err = n.child[0].cfgErrorf("label %s not defined", label)
+					err = interp.abortErrorf(n.child[0], "label %s not defined", label)
 					break
 				}
 				n.sym = sym
@@ -294,7 +299,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					case n.child[0].ident == nilIdent:
 						typ = sc.getType("interface{}")
 					case !n.child[0].isType(sc):
-						err = n.cfgErrorf("%s is not a type", n.child[0].ident)
+						err = interp.abortErrorf(n, "%s is not a type", n.child[0].ident)
 					default:
 						typ, err = nodeType(interp, sc, n.child[0])
 					}
@@ -303,6 +308,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					typ = sn.child[1].child[1].child[0].typ
 				}
 				if err != nil {
+					interp.abortErr = err
 					return false
 				}
 				nod := n.lastChild().child[0]
@@ -321,10 +327,11 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				ch := n.child[0].child[1].child[0]
 				var typ *itype
 				if typ, err = nodeType(interp, sc, ch); err != nil {
+					interp.abortErr = err
 					return false
 				}
 				if !isChan(typ) {
-					err = n.cfgErrorf("invalid operation: receive from non-chan type")
+					err = interp.abortErrorf(n, "invalid operation: receive from non-chan type")
 					return false
 				}
 				elem := chanElement(typ)
@@ -339,6 +346,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			if len(n.child) > 0 && n.child[0].isType(sc) {
 				// Get type from 1st child.
 				if n.typ, err = nodeType(interp, sc, n.child[0]); err != nil {
+					interp.abortErr = err
 					return false
 				}
 				// Indicate that the first child is the type.
@@ -359,7 +367,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					// A child indexExpr or indexListExpr is used for type parameters,
 					// it indicates an instanciated generic.
 					if n.child[0].kind != indexExpr && n.child[0].kind != indexListExpr {
-						err = n.cfgErrorf("undefined type")
+						err = interp.abortErrorf(n, "undefined type")
 						return false
 					}
 					t0, err1 := nodeType(interp, sc, n.child[0].child[0])
@@ -367,7 +375,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						return false
 					}
 					if t0.cat != genericT {
-						err = n.cfgErrorf("undefined type")
+						err = interp.abortErrorf(n, "undefined type")
 						return false
 					}
 					// We have a composite literal of generic type, instantiate it.
@@ -383,11 +391,13 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					tracePrintln(t0.node.anc, "genAST lit expr")
 					g, _, err = genAST(sc, t0.node.anc, lt)
 					if err != nil {
+						interp.abortErr = err
 						return false
 					}
 					n.child[0] = g.lastChild()
 					n.typ, err = nodeType(interp, sc, n.child[0])
 					if err != nil {
+						interp.abortErr = err
 						return false
 					}
 					// Generate methods if any.
@@ -400,12 +410,14 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						}
 						gm.typ, err = nodeType(interp, nod.scope, gm.child[2])
 						if err != nil {
+							interp.abortErr = err
 							return false
 						}
 						if _, err = interp.cfg(gm, sc, sc.pkgID, sc.pkgName); err != nil {
 							return false
 						}
 						if err = genRun(gm); err != nil {
+							interp.abortErr = err
 							return false
 						}
 						n.typ.addMethod(gm)
@@ -422,7 +434,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			// Propagate type to children, to handle implicit types
 			for _, c := range child {
 				if isBlank(c) {
-					err = n.cfgErrorf("cannot use _ as value")
+					err = interp.abortErrorf(n, "cannot use _ as value")
 					return false
 				}
 				switch c.kind {
@@ -437,6 +449,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						continue
 					}
 					if c.typ, err = nodeType(interp, sc, c); err != nil {
+						interp.abortErr = err
 						return false
 					}
 				}
@@ -449,6 +462,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 		case funcLit:
 			n.typ = nil // to force nodeType to recompute the type
 			if n.typ, err = nodeType(interp, sc, n); err != nil {
+				interp.abortErr = err
 				return false
 			}
 			n.findex = sc.add(n.typ)
@@ -457,7 +471,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 		case funcDecl:
 			// Do not allow function declarations without body.
 			if len(n.child) < 4 {
-				err = n.cfgErrorf("missing function body")
+				err = interp.abortErrorf(n, "missing function body")
 				return false
 			}
 			n.val = n
@@ -472,6 +486,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				recvTypeNode := n.child[0].child[0].lastChild()
 				typ, err := nodeType(interp, sc, recvTypeNode)
 				if err != nil {
+					interp.abortErr = err
 					return false
 				}
 				if typ.cat == genericT || (typ.val != nil && typ.val.cat == genericT) {
@@ -481,6 +496,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					rc0 := recvTypeNode.child[0]
 					rt0, err := nodeType(interp, sc, rc0)
 					if err != nil {
+						interp.abortErr = err
 						return false
 					}
 					if rc0.kind == indexExpr && rt0.cat == structT {
@@ -493,6 +509,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			// possible collisions with function argument names.
 			n.child[2].typ, err = nodeType(interp, sc, n.child[2])
 			if err != nil {
+				interp.abortErr = err
 				return false
 			}
 			n.typ = n.child[2].typ
@@ -506,6 +523,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				for _, c := range n.child[2].child[2].child {
 					var typ *itype
 					if typ, err = nodeType(interp, sc, c.lastChild()); err != nil {
+						interp.abortErr = err
 						return false
 					}
 					if len(c.child) > 1 {
@@ -524,18 +542,19 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				fr := n.child[0].child[0]
 				recvTypeNode := fr.lastChild()
 				if typ, err = nodeType(interp, sc, recvTypeNode); err != nil {
+					interp.abortErr = err
 					return false
 				}
 				if typ.cat == nilT {
 					// This may happen when instantiating generic methods.
 					s2, _, ok := sc.lookup(typ.id())
 					if !ok {
-						err = n.cfgErrorf("type not found: %s", typ.id())
+						err = interp.abortErrorf(n, "type not found: %s", typ.id())
 						break
 					}
 					typ = s2.typ
 					if typ.cat == nilT {
-						err = n.cfgErrorf("nil type: %s", typ.id())
+						err = interp.abortErrorf(n, "nil type: %s", typ.id())
 						break
 					}
 				}
@@ -552,6 +571,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			for _, c := range n.child[2].child[1].child {
 				var typ *itype
 				if typ, err = nodeType(interp, sc, c.lastChild()); err != nil {
+					interp.abortErr = err
 					return false
 				}
 				for _, cc := range c.child[:len(c.child)-1] {
@@ -587,12 +607,13 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			typeName := n.child[0].ident
 			var typ *itype
 			if typ, err = nodeType(interp, sc, n.child[1]); err != nil {
+				interp.abortErr = err
 				return false
 			}
 			if typ.incomplete {
 				// Type may still be incomplete in case of a local recursive struct declaration.
 				if typ, err = typ.finalize(); err != nil {
-					err = n.cfgErrorf("invalid type declaration")
+					err = interp.abortErrorf(n, "invalid type declaration")
 					return false
 				}
 			}
@@ -626,7 +647,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 		return true
 	}, func(n *node) {
 		// Post-order processing
-		if err != nil {
+		if err != nil || interp.abortErr != nil {
 			return
 		}
 
@@ -640,7 +661,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 		switch n.kind {
 		case addressExpr:
 			if isBlank(n.child[0]) {
-				err = n.cfgErrorf("cannot use _ as value")
+				err = interp.abortErrorf(n, "cannot use _ as value")
 				break
 			}
 			wireChild(n)
@@ -680,11 +701,11 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				var level int
 
 				if dest.rval.IsValid() && !dest.rval.CanSet() && isConstType(dest.typ) {
-					err = n.cfgErrorf("cannot assign to %s (%s constant)", dest.rval, dest.typ.str)
+					err = interp.abortErrorf(n, "cannot assign to %s (%s constant)", dest.rval, dest.typ.str)
 					break
 				}
 				if isBlank(src) {
-					err = n.cfgErrorf("cannot use _ as value")
+					err = interp.abortErrorf(n, "cannot use _ as value")
 					break
 				}
 				if n.kind == defineStmt || (n.kind == assignStmt && dest.ident == "_") {
@@ -841,7 +862,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					l--
 				}
 				if r := lc.child[0].typ.numOut(); r != l {
-					err = n.cfgErrorf("assignment mismatch: %d variables but %s returns %d values", l, lc.child[0].name(), r)
+					err = interp.abortErrorf(n, "assignment mismatch: %d variables but %s returns %d values", l, lc.child[0].name(), r)
 				}
 				if isBinCall(lc, sc) {
 					n.gen = nop
@@ -944,7 +965,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 		case indexExpr:
 			if isBlank(n.child[0]) {
-				err = n.cfgErrorf("cannot use _ as value")
+				err = interp.abortErrorf(n, "cannot use _ as value")
 				break
 			}
 			wireChild(n)
@@ -1001,7 +1022,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				name := t.id() + "[" + n.child[1].typ.id() + "]"
 				sym, _, ok := sc.lookup(name)
 				if !ok {
-					err = n.cfgErrorf("type not found: %s", name)
+					err = interp.abortErrorf(n, "type not found: %s", name)
 					return
 				}
 				n.gen = nop
@@ -1041,10 +1062,10 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					l = typ2.Len()
 					n.gen = getIndexArray
 				} else {
-					err = n.cfgErrorf("type %v does not support indexing", typ)
+					err = interp.abortErrorf(n, "type %v does not support indexing", typ)
 				}
 			default:
-				err = n.cfgErrorf("type is not an array, slice, string or map: %v", t.id())
+				err = interp.abortErrorf(n, "type is not an array, slice, string or map: %v", t.id())
 			}
 
 			err = check.index(n.child[1], l)
@@ -1075,7 +1096,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 		case sendStmt:
 			if !isChan(n.child[0].typ) {
-				err = n.cfgErrorf("invalid operation: cannot send to non-channel %s", n.child[0].typ.id())
+				err = interp.abortErrorf(n, "invalid operation: cannot send to non-channel %s", n.child[0].typ.id())
 				break
 			}
 			fallthrough
@@ -1096,7 +1117,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				break
 			}
 			if !n.hasAnc(n.sym.node) {
-				err = n.cfgErrorf("invalid break label %s", n.child[0].ident)
+				err = interp.abortErrorf(n, "invalid break label %s", n.child[0].ident)
 				break
 			}
 			n.tnext = n.sym.node
@@ -1107,7 +1128,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				break
 			}
 			if !n.hasAnc(n.sym.node) {
-				err = n.cfgErrorf("invalid continue label %s", n.child[0].ident)
+				err = interp.abortErrorf(n, "invalid continue label %s", n.child[0].ident)
 				break
 			}
 			n.tnext = n.sym.node.child[1].lastChild().start
@@ -1132,7 +1153,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 		case callExpr:
 			for _, c := range n.child {
 				if isBlank(c) {
-					err = n.cfgErrorf("cannot use _ as value")
+					err = interp.abortErrorf(n, "cannot use _ as value")
 					return
 				}
 			}
@@ -1212,7 +1233,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					case reflect.Array, reflect.Chan:
 						capConst(n)
 					default:
-						err = n.cfgErrorf("cap argument is not an array or channel")
+						err = interp.abortErrorf(n, "cap argument is not an array or channel")
 					}
 					n.findex = notInFrame
 					n.gen = nop
@@ -1225,7 +1246,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					case reflect.Array, reflect.Chan, reflect.String:
 						lenConst(n)
 					default:
-						err = n.cfgErrorf("len argument is not an array, channel or string")
+						err = interp.abortErrorf(n, "len argument is not an array, channel or string")
 					}
 					n.findex = notInFrame
 					n.gen = nop
@@ -1241,13 +1262,14 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				c1 := n.child[1]
 				switch len(n.child) {
 				case 1:
-					err = n.cfgErrorf("missing argument in conversion to %s", c0.typ.id())
+					err = interp.abortErrorf(n, "missing argument in conversion to %s", c0.typ.id())
 				case 2:
 					err = check.conversion(c1, c0.typ)
 				default:
-					err = n.cfgErrorf("too many arguments in conversion to %s", c0.typ.id())
+					err = interp.abortErrorf(n, "too many arguments in conversion to %s", c0.typ.id())
 				}
 				if err != nil {
+					interp.abortErr = err
 					break
 				}
 
@@ -1256,7 +1278,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				case isInterface(c0.typ) && !c1.isNil():
 					// Convert to interface: just check that all required methods are defined by concrete type.
 					if !c1.typ.implements(c0.typ) {
-						err = n.cfgErrorf("type %v does not implement interface %v", c1.typ.id(), c0.typ.id())
+						err = interp.abortErrorf(n, "type %v does not implement interface %v", c1.typ.id(), c0.typ.id())
 					}
 					// Convert type to interface while keeping a reference to the original concrete type.
 					// besides type, the node value remains preserved.
@@ -1318,7 +1340,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				// The call may be on a generic function. In that case, replace the
 				// generic function AST by an instantiated one before going further.
 				if c0.typ == nil {
-					tracePrintln(n, c0, "nil type on call")
+					err = interp.abortErrorf(c0, "nil type for function call: likely generic type error")
 					break
 				} else if isGeneric(c0.typ) {
 					fun := c0.typ.node.anc
@@ -1327,14 +1349,27 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					var found bool
 
 					// Infer type parameter from function call arguments.
-					if types, err = inferTypesFromCall(sc, fun, n.child[1:]); err != nil {
+					args := n.child[1:]
+					if len(args) == 0 {
+						args = n.child[0].child[1:] // use explicit type params
+					}
+					if types, err = inferTypesFromCall(sc, fun, args); err != nil {
+						interp.abortErr = err
+						tracePrintTree(n, "todo: why no args here?")
+						break
+					}
+					if len(types) == 0 {
+						err = interp.abortErrorf(fun, "generic function failed to infer types")
+						tracePrintln(fun, args, err)
 						break
 					}
 					// Generate an instantiated AST from the generic function one.
 					tracePrintln(fun, "genAST isGeneric")
 					if g, found, err = genAST(sc, fun, types); err != nil {
+						interp.abortErr = err
 						break
 					}
+
 					if !found {
 						// Compile the generated function AST, so it becomes part of the scope.
 						if _, err = interp.cfg(g, fun.scope, importPath, pkgName); err != nil {
@@ -1342,6 +1377,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						}
 						// AST compilation part 2: Generate closures for function body.
 						if err = genRun(g.child[3]); err != nil {
+							interp.abortErr = err
 							break
 						}
 					}
@@ -1351,6 +1387,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 				err = check.arguments(n, n.child[1:], c0, n.action == aCallSlice)
 				if err != nil {
+					interp.abortErr = err
 					break
 				}
 
@@ -1437,6 +1474,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				}
 			}
 			if err != nil {
+				interp.abortErr = err
 				break
 			}
 
@@ -1446,7 +1484,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 		case fallthroughtStmt:
 			if n.anc.kind != caseBody {
-				err = n.cfgErrorf("fallthrough statement out of place")
+				err = interp.abortErrorf(n, "fallthrough statement out of place")
 			}
 
 		case fileStmt:
@@ -1609,7 +1647,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				// retry with the filename, in case ident is a package name.
 				sym, level, found = sc.lookup(filepath.Join(n.ident, baseName))
 				if !found {
-					err = n.cfgErrorf("undefined: %s", n.ident)
+					err = interp.abortErrorf(n, "undefined: %s", n.ident)
 					break
 				}
 			}
@@ -1632,7 +1670,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					n.rval = sym.rval
 				case sym.kind == bltnSym:
 					if n.anc.kind != callExpr {
-						err = n.cfgErrorf("use of builtin %s not in function call", n.ident)
+						err = interp.abortErrorf(n, "use of builtin %s not in function call", n.ident)
 					}
 				}
 			}
@@ -1724,14 +1762,14 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 		case keyValueExpr:
 			if isBlank(n.child[1]) {
-				err = n.cfgErrorf("cannot use _ as value")
+				err = interp.abortErrorf(n, "cannot use _ as value")
 				break
 			}
 			wireChild(n)
 
 		case landExpr:
 			if isBlank(n.child[0]) || isBlank(n.child[1]) {
-				err = n.cfgErrorf("cannot use _ as value")
+				err = interp.abortErrorf(n, "cannot use _ as value")
 				break
 			}
 			n.start = n.child[0].start
@@ -1746,7 +1784,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 		case lorExpr:
 			if isBlank(n.child[0]) || isBlank(n.child[1]) {
-				err = n.cfgErrorf("cannot use _ as value")
+				err = interp.abortErrorf(n, "cannot use _ as value")
 				break
 			}
 			n.start = n.child[0].start
@@ -1791,12 +1829,12 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 		case returnStmt:
 			if len(n.child) > sc.def.typ.numOut() {
-				err = n.cfgErrorf("too many arguments to return")
+				err = interp.abortErrorf(n, "too many arguments to return")
 				break
 			}
 			for _, c := range n.child {
 				if isBlank(c) {
-					err = n.cfgErrorf("cannot use _ as value")
+					err = interp.abortErrorf(n, "cannot use _ as value")
 					return
 				}
 			}
@@ -1807,7 +1845,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					nret = n.child[0].child[0].typ.numOut()
 				}
 				if nret < sc.def.typ.numOut() {
-					err = n.cfgErrorf("not enough arguments to return")
+					err = interp.abortErrorf(n, "not enough arguments to return")
 					break
 				}
 			}
@@ -1818,6 +1856,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				var typ *itype
 				typ, err = nodeType(interp, sc.upperLevel(), returnSig.child[2].fieldType(i))
 				if err != nil {
+					interp.abortErr = err
 					return
 				}
 				// TODO(mpl): move any of that code to typecheck?
@@ -1837,7 +1876,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			n.typ = n.child[0].typ
 			n.recv = n.child[0].recv
 			if n.typ == nil {
-				err = n.cfgErrorf("undefined type")
+				err = interp.abortErrorf(n, "undefined type")
 				break
 			}
 			switch {
@@ -1859,7 +1898,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					n.action = aGetSym
 					n.gen = nop
 				} else {
-					err = n.cfgErrorf("package %s \"%s\" has no symbol %s", n.child[0].ident, pkg, name)
+					err = interp.abortErrorf(n, "package %s \"%s\" has no symbol %s", n.child[0].ident, pkg, name)
 				}
 			case n.typ.cat == srcPkgT:
 				pkg, name := n.child[0].sym.typ.path, n.child[1].ident
@@ -1877,7 +1916,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					n.recv = sym.recv
 					n.rval = sym.rval
 				} else {
-					err = n.cfgErrorf("undefined selector: %s.%s", pkg, name)
+					err = interp.abortErrorf(n, "undefined selector: %s.%s", pkg, name)
 				}
 			case isStruct(n.typ) || isInterfaceSrc(n.typ):
 				// Find a matching field.
@@ -1890,7 +1929,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 							goto tryMethods
 						}
 						if d == len(ti) {
-							err = n.cfgErrorf("ambiguous selector: %s", n.child[1].ident)
+							err = interp.abortErrorf(n, "ambiguous selector: %s", n.child[1].ident)
 							break
 						}
 					}
@@ -1929,7 +1968,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 							goto tryMethods
 						}
 						if d == len(lind) {
-							err = n.cfgErrorf("ambiguous selector: %s", n.child[1].ident)
+							err = interp.abortErrorf(n, "ambiguous selector: %s", n.child[1].ident)
 							break
 						}
 					}
@@ -1999,7 +2038,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 		case starExpr:
 			if isBlank(n.child[0]) {
-				err = n.cfgErrorf("cannot use _ as value")
+				err = interp.abortErrorf(n, "cannot use _ as value")
 				break
 			}
 			switch {
@@ -2022,6 +2061,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 				err = check.starExpr(n.child[0])
 				if err != nil {
+					interp.abortErr = err
 					break
 				}
 
@@ -2155,17 +2195,19 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			wireChild(n)
 			c0, c1 := n.child[0], n.child[1]
 			if isBlank(c0) || isBlank(c1) {
-				err = n.cfgErrorf("cannot use _ as value")
+				err = interp.abortErrorf(n, "cannot use _ as value")
 				break
 			}
 			if c1.typ == nil {
 				if c1.typ, err = nodeType(interp, sc, c1); err != nil {
+					interp.abortErr = err
 					return
 				}
 			}
 
 			err = check.typeAssertionExpr(c0, c1.typ)
 			if err != nil {
+				interp.abortErr = err
 				break
 			}
 
@@ -2184,10 +2226,12 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 			err = check.sliceExpr(n)
 			if err != nil {
+				interp.abortErr = err
 				break
 			}
 
 			if n.typ, err = nodeType(interp, sc, n); err != nil {
+				interp.abortErr = err
 				return
 			}
 			n.findex = sc.add(n.typ)
@@ -2197,6 +2241,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 
 			err = check.unaryExpr(n)
 			if err != nil {
+				interp.abortErr = err
 				break
 			}
 
@@ -2211,6 +2256,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			}
 			if n.typ == nil {
 				if n.typ, err = nodeType(interp, sc, n); err != nil {
+					interp.abortErr = err
 					return
 				}
 			}
@@ -2242,6 +2288,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			l := len(n.child) - 1
 			if n.typ = n.child[l].typ; n.typ == nil {
 				if n.typ, err = nodeType(interp, sc, n.child[l]); err != nil {
+					interp.abortErr = err
 					return
 				}
 			}
@@ -2879,8 +2926,8 @@ func getExec(n *node) bltn {
 
 // setExec recursively sets the node exec builtin function by walking the CFG
 // from the entry point (first node to exec).
-func setExec(n *node) {
-	if n.exec != nil {
+func setExec(sn *node) {
+	if sn.exec != nil {
 		return
 	}
 	seen := map[*node]bool{}
@@ -2907,10 +2954,14 @@ func setExec(n *node) {
 				set(n.fnext)
 			}
 		}
+		if n.gen == nil {
+			tracePrintTree(sn, n, "setExec nil gen")
+			n.gen = nop
+		}
 		n.gen(n)
 	}
 
-	set(n)
+	set(sn)
 }
 
 func typeSwichAssign(n *node) bool {

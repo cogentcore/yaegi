@@ -1,7 +1,6 @@
 package interp
 
 import (
-	"fmt"
 	"strings"
 	"sync/atomic"
 )
@@ -36,47 +35,13 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 		sname += t.id() + ","
 	}
 	sname = strings.TrimSuffix(sname, ",") + "]"
-	if trace {
-		tracePrintln(root, "genAST", sname)
-	}
+	tracePrintTree(root, "genAST", sname)
 
 	gtree = func(n, anc *node) (*node, error) {
-		if trace {
-			tracePrintln(n)
-		}
 		nod := copyNode(n, anc, false)
 		switch n.kind {
 		case funcDecl, funcType:
 			nod.val = nod
-
-		/*  todo: this is not path that gets hit in cfg for fun[int]() -- come back to it
-		case callExpr:
-			c0 := n.child[0]
-			if c0.kind != indexExpr {
-				break
-			}
-			fun := c0
-			tracePrintTree(n, n, "generic start", fun)
-			lt := []*itype{}
-			for _, c := range c0.child[1:] {
-				sym, _, _ := sc.lookup(c.ident)
-				c.typ = sym.typ
-				tracePrintln(c, "type", c.typ, "sym", sym, sym.typ)
-				lt = append(lt, sym.typ)
-			}
-			tracePrintln(c0, "recursive gen:", fun.ident, lt)
-			g, found, err := genAST(sc, fun, lt)
-			if err != nil {
-				tracePrintln(c0, "rgen failed:", found, err)
-				break
-			}
-			n.child[0] = g
-			if g.typ == nil {
-				tracePrintln(g, "type is nil, setting to:", lt[0])
-				g.typ = lt[0] // todo: what is actual type here?
-			}
-			return g, nil
-		*/
 
 		case identExpr:
 			// Replace generic type by instantiated one.
@@ -88,43 +53,15 @@ func genAST(sc *scope, root *node, types []*itype) (*node, bool, error) {
 			nod.typ = nt.typ
 
 		case indexExpr:
-			tracePrintln(n, n.anc, "in index expr")
 			// Catch a possible recursive generic type definition
 			if root.kind == typeSpec {
-				tracePrintln(root, "root kind == typeSpec")
 				if root.child[0].ident == n.child[0].ident {
-					tracePrintln(root.child[0], "same ident")
 					nod := copyNode(n.child[0], anc, false)
 					fixNodes = append(fixNodes, nod)
 					return nod, nil
 				}
 			}
-			if len(n.child) == 0 || n.child[0].typ == nil {
-				tracePrintln(n, "no c0 with typ")
-				break
-			}
-			t := n.child[0].typ
-			for t.cat == linkedT {
-				t = t.val
-			}
-			if t.cat != funcT {
-				break
-			}
-			c1 := n.child[1]
-			if !c1.isType(sc) {
-				break
-			}
-			tracePrintln(t.node.anc, "generic genAST indexed funcT")
-			g, _, err := genAST(sc, t.node.anc, []*itype{c1.typ})
-			if err != nil {
-				tracePrintln(g, "error", err)
-				return n, err
-			}
-			// Replace generic func node by instantiated one.
-			n.anc.child[childPos(n)] = g
-			n.typ = g.typ
-			tracePrintln(n, g, "gen type", g.typ, "par", n.anc, fmt.Sprintf("n: %p  g: %p par: %p", n, g, n.anc))
-			return n, nil
+			break
 
 		case fieldList:
 			//  Node is the type parameters list of a generic function.
@@ -292,14 +229,22 @@ func inferTypesFromCall(sc *scope, fun *node, args []*node) ([]*itype, error) {
 		}
 		for _, cc := range c.child[:len(c.child)-1] {
 			paramTypes[cc.ident] = typ
+			tracePrintln(ftn, "infer types paramTypes", cc, typ)
 		}
 	}
 
 	var inferTypes func(*itype, *itype) ([]*itype, error)
 	inferTypes = func(param, input *itype) ([]*itype, error) {
+		tracePrintln(ftn, "infer param:", param, "cat:", param.cat, "input:", input)
 		switch param.cat {
 		case chanT, ptrT, sliceT:
 			return inferTypes(param.val, input.val)
+
+		case valueT:
+			tracePrintln(ftn, "valueT", param.name, paramTypes[param.name])
+			// if paramTypes[param.name] != nil {
+			return []*itype{input}, nil
+			// }
 
 		case mapT:
 			k, err := inferTypes(param.key, input.key)
@@ -359,14 +304,34 @@ func inferTypesFromCall(sc *scope, fun *node, args []*node) ([]*itype, error) {
 	}
 
 	types := []*itype{}
-	for i, c := range ftn.child[1].child {
+	if len(args) == 0 {
+		err := ftn.cfgErrorf("generic function type infer: no args")
+		tracePrintln(ftn, err)
+		return types, err
+	}
+	var kids []*node
+	tracePrintTree(ftn, "ftn")
+	tracePrintln(ftn, "child[1]", ftn.child[1], len(ftn.child[1].child), "child[0]", ftn.child[0].child[0], len(ftn.child[0].child[0].child))
+	if len(ftn.child[1].child) == 0 && len(ftn.child[0].child[0].child) > 1 {
+		kids = ftn.child[0].child // if no args, use type parameters
+	} else {
+		kids = ftn.child[1].child // first args
+	}
+	if len(kids) == 0 {
+		err := ftn.cfgErrorf("generic function type infer: no children")
+		return types, err
+	}
+
+	for i, c := range kids {
 		typ, err := nodeType(fun.interp, sc, c.lastChild())
+		tracePrintln(c, "typ:", typ, "lastchild:", c.lastChild())
 		if err != nil {
+			tracePrintln(c, "err:", err)
 			return nil, err
 		}
 		if i >= len(args) {
-			fmt.Println("generic functions do not yet support variadic args")
-			return nil, nil
+			err = ftn.cfgErrorf("generic functions do not yet support variadic args")
+			return nil, err
 		}
 		lt, err := inferTypes(typ, args[i].typ)
 		if err != nil {

@@ -967,13 +967,14 @@ func (check typecheck) arguments(n *node, child []*node, fun *node, ellipsis boo
 		}
 	}
 
+	if fun.typ == nil {
+		err := fun.cfgErrorf("typecheck arguments: nil function type: likely a syntax error above this point")
+		tracePrintln(fun, err)
+		return err
+	}
 	var cnt int
 	for i, param := range params {
 		ellip := i == l-1 && ellipsis
-		if fun.typ == nil {
-			tracePrintln(fun, "nil fun type")
-			break
-		}
 		if err := check.argument(param, fun.typ, cnt, l, ellip); err != nil {
 			return err
 		}

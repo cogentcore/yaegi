@@ -139,7 +139,6 @@ func TestGenericFuncInfer(t *testing.T) {
 		"guthib.com/generic/generic": map[string]reflect.Value{
 			"New":   reflect.ValueOf(GenericFunc("func New[T any]() *T { return new(T) }")),
 			"AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any](init func(n *T)) { v := New[T](); init(v); println(*v) }")),
-			// "AddAt": reflect.ValueOf(GenericFunc("func AddAt[T any]() *T { v := generic.New[T](T); return v }")),
 		},
 	})
 	i.ImportUsed()
