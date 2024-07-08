@@ -212,8 +212,13 @@ func TestForRangeInt(t *testing.T) {
 	i := New(Options{})
 	_, err := i.Eval(`
 func main() {
+	var is []*int
 	for i := range 3 {
 		println(i)
+		is = append(is, &i)
+	}
+	for _, ip := range is {
+		println(*ip)
 	}
 	n := 4
 	for i := range n {
