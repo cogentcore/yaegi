@@ -215,6 +215,10 @@ func main() {
 	for i := range 3 {
 		println(i)
 	}
+	n := 4
+	for i := range n {
+		println(i)
+	}
 }
 `)
 	if err != nil {

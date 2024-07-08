@@ -206,10 +206,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 							sc.add(sc.getType("int")) // Add a dummy type to store array shallow copy for range
 							ktyp = sc.getType("int")
 							vtyp = valueTOf(typ.Elem())
-						case reflect.Int:
-							tracePrintTree(n.anc, "for range value")
-							sc.add(sc.getType("int"))
-							ktyp = sc.getType("int")
 						}
 					case mapT:
 						n.anc.gen = rangeMap
