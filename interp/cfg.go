@@ -182,6 +182,8 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						k, o = n.anc.child[0], n.anc.child[1]
 					}
 
+					tracePrintTree(n.anc, "for range value", "k:", k, "o:", o, "cat:", o.typ.cat)
+
 					switch o.typ.cat {
 					case valueT, linkedT:
 						typ := o.typ.rtype
@@ -204,6 +206,10 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 							sc.add(sc.getType("int")) // Add a dummy type to store array shallow copy for range
 							ktyp = sc.getType("int")
 							vtyp = valueTOf(typ.Elem())
+						case reflect.Int:
+							tracePrintTree(n.anc, "for range value")
+							sc.add(sc.getType("int"))
+							ktyp = sc.getType("int")
 						}
 					case mapT:
 						n.anc.gen = rangeMap
@@ -228,6 +234,11 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						sc.add(sc.getType("int")) // Add a dummy type to store array shallow copy for range
 						ktyp = sc.getType("int")
 						vtyp = o.typ.val
+					case intT:
+						n.anc.gen = rangeInt
+						tracePrintTree(n.anc, "for range value")
+						sc.add(sc.getType("int"))
+						ktyp = sc.getType("int")
 					}
 
 					kindex := sc.add(ktyp)
@@ -1593,6 +1604,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			sc = sc.pop()
 
 		case forRangeStmt:
+			tracePrintTree(n, "for range")
 			n.start = n.child[0].start
 			setFNext(n.child[0], n)
 			sc = sc.pop()

@@ -207,3 +207,17 @@ func main() {
 		t.Error(err)
 	}
 }
+
+func TestForRangeInt(t *testing.T) {
+	i := New(Options{})
+	_, err := i.Eval(`
+func main() {
+	for i := range 3 {
+		println(i)
+	}
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
