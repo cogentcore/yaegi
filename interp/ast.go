@@ -599,7 +599,7 @@ func (interp *Interpreter) ast(f ast.Node) (string, *node, error) {
 		case *ast.BlockStmt:
 			b := addChild(&root, anc, pos, blockStmt, aNop)
 			st.push(b, nod)
-			if anc.node.kind == rangeStmt {
+			if anc.node != nil && anc.node.kind == rangeStmt {
 				// add k, v per-loop vars
 				addChild(&root, astNode{b, nod}, pos, identExpr, aNop)
 				addChild(&root, astNode{b, nod}, pos, identExpr, aNop)
