@@ -53,7 +53,7 @@ func init() {
 }
 
 // set trace to true for debugging the cfg and other processes
-var trace = false
+var trace = true
 
 func traceIndent(n *node) string {
 	return strings.Repeat("  ", n.depth())
@@ -264,7 +264,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					sc.sym[lk.ident] = &symbol{index: kindex, kind: varSym, typ: lk.typ}
 					lk.findex = kindex
 					lk.gen = loopVarKey
-					tracePrintTree(n.anc, "for range loop vars")
 				} else {
 					lk.ident = "_"
 					lk.typ = sc.getType("int")
@@ -276,6 +275,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					vindex := sc.add(lv.typ)
 					sc.sym[lv.ident] = &symbol{index: vindex, kind: varSym, typ: lv.typ}
 					lv.findex = vindex
+					lv.gen = loopVarVal
 				} else {
 					lv.ident = "_"
 					lv.typ = sc.getType("int")

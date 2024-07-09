@@ -222,6 +222,21 @@ func main() {
 	}
 }
 
+func TestForRangeSlice(t *testing.T) {
+	i := New(Options{})
+	_, err := i.Eval(`
+func main() {
+	s := []int{1,2,3}
+	for i, v := range s {
+		println(i,v)
+	}
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
 func TestForRangeClosure(t *testing.T) {
 	i := New(Options{})
 	_, err := i.Eval(`
