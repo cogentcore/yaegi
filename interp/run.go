@@ -2940,6 +2940,17 @@ func loopVarFor(n *node) {
 	}
 }
 
+func funcLitCopy(n *node) {
+	next := getExec(n.tnext)
+	n.exec = func(f *frame) bltn {
+		ov := f.data[n.findex]
+		nv := reflect.New(ov.Type()).Elem()
+		nv.Set(ov)
+		f.data[n.findex] = nv
+		return next
+	}
+}
+
 func rangeChan(n *node) {
 	i := n.child[0].findex        // element index location in frame
 	value := genValue(n.child[1]) // chan

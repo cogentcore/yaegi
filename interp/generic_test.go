@@ -313,3 +313,26 @@ func main() {
 		t.Error(err)
 	}
 }
+
+func TestClosureFailure(t *testing.T) {
+	i := New(Options{})
+	_, err := i.Eval(`
+func main() {
+	fs := []func()
+	add := func(fun func()) {
+		fs = append(fs, fun)
+	}
+	
+	for i := range 3 {
+		println(i)
+		add(func() { println(i) })
+	}
+	for _, f := range fs {
+		f()
+	}
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
