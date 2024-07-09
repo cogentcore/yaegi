@@ -1658,10 +1658,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			n.types, n.scope = sc.types, sc
 			sc = sc.pop()
 			err = genRun(n)
-			if n.anc != nil && n.anc.kind != defineStmt {
-				n.gen = funcLitCopy
-			}
-			tracePrintTree(n, "func Lit")
 
 		case deferStmt, goStmt:
 			wireChild(n)

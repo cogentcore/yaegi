@@ -981,6 +981,7 @@ func genFunctionWrapper(n *node) func(*frame) reflect.Value {
 	var ok bool
 
 	if def, ok = n.val.(*node); !ok {
+		tracePrintln(n, "gen fun wrap val node", def)
 		return genValueAsFunctionWrapper(n)
 	}
 	start := def.child[3].start
@@ -1046,6 +1047,7 @@ func genFunctionWrapper(n *node) func(*frame) reflect.Value {
 			// Interpreter code execution.
 			runCfg(start, fr, def, n)
 
+			tracePrintln(n, "gen fun wrap norm", def)
 			return fr.data[:numRet]
 		})
 	}
@@ -1526,6 +1528,7 @@ func callBin(n *node) {
 			case isInterfaceSrc(c.typ):
 				values = append(values, genValueInterfaceValue(c))
 			case isFuncSrc(c.typ):
+				tracePrintln(c, "arg val fc")
 				values = append(values, genFunctionWrapper(c))
 			case c.typ.cat == arrayT || c.typ.cat == variadicT:
 				if isEmptyInterface(c.typ.val) {
@@ -1931,6 +1934,7 @@ func getFunc(n *node) {
 		})
 
 		f.mutex.Lock()
+		tracePrintln(n, "frame clone:", valString(fct))
 		getFrame(f, l).data[i] = fct
 		f.mutex.Unlock()
 
@@ -2939,25 +2943,6 @@ func loopVarFor(n *node) {
 		nv := reflect.New(fv.Type()).Elem()
 		nv.Set(fv)
 		f.data[n.findex] = nv
-		return next
-	}
-}
-
-func funcLitCopy(n *node) {
-	getFunc(n)
-	gfe := n.exec
-	next := getExec(n.tnext)
-	l := n.level
-	ind := n.findex
-	s := genDestValue(n.typ, n)
-	n.exec = func(f *frame) bltn {
-		gfe(f)
-		data := getFrame(f, l).data
-		ov := s(f)
-		nv := reflect.New(ov.Type()).Elem()
-		tracePrintln(n, "func lit copy", "level:", l, "ov:", valString(ov), "nv:", valString(nv))
-		nv.Set(ov)
-		data[ind] = nv
 		return next
 	}
 }
