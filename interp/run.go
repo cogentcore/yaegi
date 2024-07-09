@@ -722,7 +722,6 @@ func assign(n *node) {
 				data := getFrame(f, l).data
 				ov := s(f)
 				nv := reflect.New(ov.Type()).Elem()
-				tracePrintln(n, "copying source", "level:", l, "ov:", valString(ov), "nv:", valString(nv))
 				nv.Set(ov)
 				data[ind] = nv
 				return next
@@ -981,9 +980,9 @@ func genFunctionWrapper(n *node) func(*frame) reflect.Value {
 	var ok bool
 
 	if def, ok = n.val.(*node); !ok {
-		tracePrintln(n, "gen fun wrap val node", def)
 		return genValueAsFunctionWrapper(n)
 	}
+
 	start := def.child[3].start
 	numRet := len(def.typ.ret)
 	var rcvr func(*frame) reflect.Value
@@ -992,8 +991,19 @@ func genFunctionWrapper(n *node) func(*frame) reflect.Value {
 		rcvr = genValueRecv(n)
 	}
 	funcType := n.typ.TypeOf()
+	value := genValue(n)
 
 	return func(f *frame) reflect.Value {
+		v := value(f)
+		if v.Kind() == reflect.Func {
+			// per #1634, if v is already a func, then don't re-wrap!  critically, the original wrapping
+			// clones the frame, whereas the one here (below) does _not_ clone the frame, so it doesn't
+			// generate the proper closure capture effects!
+			// this path is the same as genValueAsFunctionWrapper which is the path taken above if
+			// the value has an associated node, which happens when you do f := func() ..
+			return v
+		}
+
 		return reflect.MakeFunc(funcType, func(in []reflect.Value) []reflect.Value {
 			// Allocate and init local frame. All values to be settable and addressable.
 			fr := newFrame(f, len(def.types), f.runid())
@@ -1047,7 +1057,6 @@ func genFunctionWrapper(n *node) func(*frame) reflect.Value {
 			// Interpreter code execution.
 			runCfg(start, fr, def, n)
 
-			tracePrintln(n, "gen fun wrap norm", def)
 			return fr.data[:numRet]
 		})
 	}
@@ -1528,7 +1537,6 @@ func callBin(n *node) {
 			case isInterfaceSrc(c.typ):
 				values = append(values, genValueInterfaceValue(c))
 			case isFuncSrc(c.typ):
-				tracePrintln(c, "arg val fc")
 				values = append(values, genFunctionWrapper(c))
 			case c.typ.cat == arrayT || c.typ.cat == variadicT:
 				if isEmptyInterface(c.typ.val) {
@@ -1934,7 +1942,6 @@ func getFunc(n *node) {
 		})
 
 		f.mutex.Lock()
-		tracePrintln(n, "frame clone:", valString(fct))
 		getFrame(f, l).data[i] = fct
 		f.mutex.Unlock()
 

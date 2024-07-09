@@ -16,9 +16,7 @@ func valueGenerator(n *node, i int) func(*frame) reflect.Value {
 		return func(f *frame) reflect.Value { return valueOf(f.root.data, i) }
 	case 0:
 		return func(f *frame) reflect.Value {
-			v := valueOf(f.data, i)
-			tracePrintln(n, "value gen", i, valString(v))
-			return v
+			return valueOf(f.data, i)
 		}
 	case 1:
 		return func(f *frame) reflect.Value { return valueOf(f.anc.data, i) }
