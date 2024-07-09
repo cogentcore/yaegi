@@ -687,10 +687,8 @@ func assign(n *node) {
 	for i := 0; i < n.nleft; i++ {
 		dest, src := n.child[i], n.child[sbase+i]
 		if isNamedFuncSrc(src.typ) {
-			fmt.Println("gen func value")
 			svalue[i] = genFuncValue(src)
 		} else {
-			fmt.Println("gen dest value")
 			svalue[i] = genDestValue(dest.typ, src)
 		}
 		if isMapEntry(dest) {
@@ -724,7 +722,7 @@ func assign(n *node) {
 				data := getFrame(f, l).data
 				ov := s(f)
 				nv := reflect.New(ov.Type()).Elem()
-				tracePrintln(n, "copying source", "level:", l, "ov:", ov.String(), "nv:", nv.String())
+				tracePrintln(n, "copying source", "level:", l, "ov:", valString(ov), "nv:", valString(nv))
 				nv.Set(ov)
 				data[ind] = nv
 				return next
@@ -2946,15 +2944,18 @@ func loopVarFor(n *node) {
 }
 
 func funcLitCopy(n *node) {
+	getFunc(n)
+	gfe := n.exec
 	next := getExec(n.tnext)
 	l := n.level
 	ind := n.findex
 	s := genDestValue(n.typ, n)
 	n.exec = func(f *frame) bltn {
+		gfe(f)
 		data := getFrame(f, l).data
 		ov := s(f)
 		nv := reflect.New(ov.Type()).Elem()
-		tracePrintln(n, "func lit copy", "level:", l, "ov:", ov.String(), "nv:", nv.String())
+		tracePrintln(n, "func lit copy", "level:", l, "ov:", valString(ov), "nv:", valString(nv))
 		nv.Set(ov)
 		data[ind] = nv
 		return next

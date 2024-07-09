@@ -1640,6 +1640,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			n.start = n.child[0].start
 			setFNext(n.child[0], n)
 			sc = sc.pop()
+			tracePrintTree(n, "for range")
 
 		case funcDecl:
 			n.start = n.child[3].start

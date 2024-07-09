@@ -56,9 +56,20 @@ type node struct {
 }
 
 // nodeAddr returns the pointer address of node, short version
-func (n *node) nodeAddr() string {
-	p := fmt.Sprintf("%p", n)
+func ptrAddr(v any) string {
+	p := fmt.Sprintf("%p", v)
 	return p[:2] + p[9:] // unique bits
+}
+
+// valString returns string rep of given value, showing underlying pointers etc
+func valString(v reflect.Value) string {
+	s := v.String()
+	if v.Kind() == reflect.Func || v.Kind() == reflect.Map || v.Kind() == reflect.Pointer || v.Kind() == reflect.Slice || v.Kind() == reflect.UnsafePointer {
+		p := fmt.Sprintf("%#x", v.Pointer())
+		ln := len(p)
+		s += " " + p[:2] + p[max(2, ln-4):]
+	}
+	return s
 }
 
 func (n *node) String() string {
@@ -66,20 +77,23 @@ func (n *node) String() string {
 	if n.ident != "" {
 		s += " " + n.ident
 	}
-	s += " " + n.nodeAddr()
+	s += " " + ptrAddr(n)
 	if n.sym != nil {
 		s += " sym:" + n.sym.String()
 	} else if n.typ != nil {
 		s += " typ:" + n.typ.String()
 	}
+	if n.findex >= 0 {
+		s += fmt.Sprintf(" fidx: %d lev: %d", n.findex, n.level)
+	}
 	if n.start != nil && n.start != n {
-		s += fmt.Sprintf(" ->start: %s %s", n.start.kind.String(), n.start.nodeAddr())
+		s += fmt.Sprintf(" ->start: %s %s", n.start.kind.String(), ptrAddr(n.start))
 	}
 	if n.tnext != nil {
-		s += fmt.Sprintf(" ->tnext: %s %s", n.tnext.kind.String(), n.tnext.nodeAddr())
+		s += fmt.Sprintf(" ->tnext: %s %s", n.tnext.kind.String(), ptrAddr(n.tnext))
 	}
 	if n.fnext != nil {
-		s += fmt.Sprintf(" ->fnext: %s %s", n.fnext.kind.String(), n.fnext.nodeAddr())
+		s += fmt.Sprintf(" ->fnext: %s %s", n.fnext.kind.String(), ptrAddr(n.fnext))
 	}
 	return s
 }

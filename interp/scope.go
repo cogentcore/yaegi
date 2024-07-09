@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"fmt"
 	"log"
 	"reflect"
 	"strconv"
@@ -64,6 +65,12 @@ func (sy *symbol) String() string {
 	}
 	if sy.rval.IsValid() {
 		s += " = " + sy.rval.String()
+	}
+	if sy.index >= 0 {
+		s += fmt.Sprintf(" idx: %d", sy.index)
+	}
+	if sy.node != nil {
+		s += " " + sy.node.String()
 	}
 	return s
 }
