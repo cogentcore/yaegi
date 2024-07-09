@@ -53,7 +53,7 @@ func init() {
 }
 
 // set trace to true for debugging the cfg and other processes
-var trace = false
+var trace = true
 
 func traceIndent(n *node) string {
 	return strings.Repeat("  ", n.depth())
@@ -97,7 +97,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			// note: abortErr catches sub-calls that global err misses
 			return false
 		}
-		tracePrintln(n)
+		tracePrintln(n, "pre")
 		if n.scope == nil {
 			n.scope = sc
 		}
@@ -1657,7 +1657,9 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			n.types, n.scope = sc.types, sc
 			sc = sc.pop()
 			err = genRun(n)
-			// n.gen = funcLitCopy
+			if n.anc != nil && n.anc.kind != defineStmt {
+				n.gen = funcLitCopy
+			}
 			tracePrintTree(n, "func Lit")
 
 		case deferStmt, goStmt:
@@ -2343,6 +2345,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				c.findex = index
 			}
 		}
+		tracePrintln(n, "post")
 	})
 
 	if sc != interp.universe {
