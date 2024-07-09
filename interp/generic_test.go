@@ -314,18 +314,48 @@ func main() {
 	}
 }
 
-func TestClosureFailure(t *testing.T) {
+func TestExportClosureArgFailure(t *testing.T) {
 	i := New(Options{})
+	i.Use(Exports{
+		"tmp/tmp": map[string]reflect.Value{
+			"Func": reflect.ValueOf(func(s *[]func(), f func()) { *s = append(*s, f) }),
+		},
+	})
+	i.ImportUsed()
 	_, err := i.Eval(`
 func main() {
-	fs := []func()
-	add := func(fun func()) {
-		fs = append(fs, fun)
-	}
+	fs := []func(){}
 	
 	for i := range 3 {
 		println(i)
-		add(func() { println(i) })
+		tmp.Func(&fs, func() { println(i) })
+	}
+	for _, f := range fs {
+		f()
+	}
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestExportClosureArgWorkaround(t *testing.T) {
+	i := New(Options{})
+	i.Use(Exports{
+		"tmp/tmp": map[string]reflect.Value{
+			"Func": reflect.ValueOf(func(s *[]func(), f func()) { *s = append(*s, f) }),
+		},
+	})
+	i.ImportUsed()
+	_, err := i.Eval(`
+func main() {
+	fs := []func(){}
+	
+	for i := range 3 {
+		println(i)
+		f := func() { println(i) }
+		tmp.Func(&fs, f)
 	}
 	for _, f := range fs {
 		f()
