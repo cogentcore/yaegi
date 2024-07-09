@@ -228,11 +228,31 @@ func TestForRangeClosure(t *testing.T) {
 func main() {
 	fs := []func()
 	for i := range 3 {
-		println(i)
-		fs = append(fs, func() { println(i) })
+		println(i, &i)
+		fs = append(fs, func() { println(i, &i) })
 	}
-	for _, f := range fs {
+	for j := 0; j < len(fs); j++ {
+		f := fs[j]
 		f()
+	}
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestForRangeAddr(t *testing.T) {
+	i := New(Options{})
+	_, err := i.Eval(`
+func main() {
+	is := []*int
+	for i := range 3 {
+		println(i)
+		is = append(is, &i)
+	}
+	for j := 0; j < len(is); j++ {
+		println(*is[j])
 	}
 }
 `)

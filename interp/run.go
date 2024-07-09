@@ -2908,8 +2908,10 @@ func loopVarKey(n *node) {
 	ixn := n.anc.anc.child[0]
 	next := getExec(n.tnext)
 	n.exec = func(f *frame) bltn {
-		ki := f.data[ixn.findex].Int()
-		f.data[n.findex].SetInt(ki)
+		lv := f.data[ixn.findex]
+		nv := reflect.New(lv.Type()).Elem()
+		nv.SetInt(lv.Int())
+		f.data[n.findex] = nv
 		return next
 	}
 }
