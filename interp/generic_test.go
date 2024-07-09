@@ -222,21 +222,17 @@ func main() {
 	}
 }
 
-func TestForRangeInt(t *testing.T) {
+func TestForRangeClosure(t *testing.T) {
 	i := New(Options{})
 	_, err := i.Eval(`
 func main() {
-	var is []*int
+	fs := []func()
 	for i := range 3 {
 		println(i)
-		is = append(is, &i)
+		fs = append(fs, func() { println(i) })
 	}
-	for _, ip := range is {
-		println(*ip)
-	}
-	n := 4
-	for i := range n {
-		println(i)
+	for _, f := range fs {
+		f()
 	}
 }
 `)

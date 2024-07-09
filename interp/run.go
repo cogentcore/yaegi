@@ -2888,7 +2888,6 @@ func rangeInt(n *node) {
 	n.exec = func(f *frame) bltn {
 		v0 := f.data[index0]
 		v0.SetInt(v0.Int() + 1)
-		fmt.Println("v0:", v0.Int())
 		if int(v0.Int()) >= int(f.data[index2].Int()) {
 			return fnext
 		}
@@ -2909,8 +2908,7 @@ func loopVarKey(n *node) {
 	ixn := n.anc.anc.child[0]
 	next := getExec(n.tnext)
 	n.exec = func(f *frame) bltn {
-		ki := f.anc.data[ixn.findex].Int()
-		tracePrintln(n, ki, "lkidx:", n.findex)
+		ki := f.data[ixn.findex].Int()
 		f.data[n.findex].SetInt(ki)
 		return next
 	}

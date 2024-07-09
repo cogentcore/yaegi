@@ -53,7 +53,7 @@ func init() {
 }
 
 // set trace to true for debugging the cfg and other processes
-var trace = true
+var trace = false
 
 func traceIndent(n *node) string {
 	return strings.Repeat("  ", n.depth())
@@ -63,7 +63,7 @@ func tracePrintln(n *node, v ...any) {
 	if !trace {
 		return
 	}
-	fmt.Println(append([]any{traceIndent(n), n, fmt.Sprintf("%p", n)}, v...)...)
+	fmt.Println(append([]any{traceIndent(n), n}, v...)...)
 }
 
 func tracePrintTree(n *node, v ...any) {
@@ -182,8 +182,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					} else {
 						k, o = n.anc.child[0], n.anc.child[1]
 					}
-
-					tracePrintTree(n.anc, "for range value", "k:", k, "o:", o, "cat:", o.typ.cat)
 
 					switch o.typ.cat {
 					case valueT, linkedT:
@@ -1845,12 +1843,13 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				} else {
 					k, o, body = n.child[0], n.child[1], n.child[2]
 				}
-				n.start = o.start    // Get array or map object
-				o.tnext = k.start    // then go to iterator init
-				k.tnext = n          // then go to range function
-				n.tnext = body.start // then go to range body
-				body.tnext = n       // then body go to range function (loop)
-				k.gen = empty        // init filled later by generator
+				n.start = o.start          // Get array or map object
+				o.tnext = k.start          // then go to iterator init
+				k.tnext = n                // then go to range function
+				body.start = body.child[0] // loopvar
+				n.tnext = body.start       // then go to range body
+				body.tnext = n             // then body go to range function (loop)
+				k.gen = empty              // init filled later by generator
 			}
 
 		case returnStmt:

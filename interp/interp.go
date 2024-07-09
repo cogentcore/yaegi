@@ -55,15 +55,31 @@ type node struct {
 	meta       interface{}    // meta stores meta information between gta runs, like errors
 }
 
+// nodeAddr returns the pointer address of node, short version
+func (n *node) nodeAddr() string {
+	p := fmt.Sprintf("%p", n)
+	return p[:2] + p[9:] // unique bits
+}
+
 func (n *node) String() string {
 	s := n.kind.String()
 	if n.ident != "" {
 		s += " " + n.ident
 	}
+	s += " " + n.nodeAddr()
 	if n.sym != nil {
 		s += " sym:" + n.sym.String()
 	} else if n.typ != nil {
 		s += " typ:" + n.typ.String()
+	}
+	if n.start != nil && n.start != n {
+		s += fmt.Sprintf(" ->start: %s %s", n.start.kind.String(), n.start.nodeAddr())
+	}
+	if n.tnext != nil {
+		s += fmt.Sprintf(" ->tnext: %s %s", n.tnext.kind.String(), n.tnext.nodeAddr())
+	}
+	if n.fnext != nil {
+		s += fmt.Sprintf(" ->fnext: %s %s", n.fnext.kind.String(), n.fnext.nodeAddr())
 	}
 	return s
 }
