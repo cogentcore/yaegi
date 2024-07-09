@@ -53,7 +53,7 @@ func init() {
 }
 
 // set trace to true for debugging the cfg and other processes
-var trace = true
+var trace = false
 
 func traceIndent(n *node) string {
 	return strings.Repeat("  ", n.depth())
@@ -264,9 +264,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					sc.sym[lk.ident] = &symbol{index: kindex, kind: varSym, typ: lk.typ}
 					lk.findex = kindex
 					lk.gen = loopVarKey
-				} else {
-					lk.ident = "_"
-					lk.typ = sc.getType("int")
 				}
 				lv := n.child[1]
 				if rangev != nil {
@@ -276,9 +273,19 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					sc.sym[lv.ident] = &symbol{index: vindex, kind: varSym, typ: lv.typ}
 					lv.findex = vindex
 					lv.gen = loopVarVal
-				} else {
-					lv.ident = "_"
-					lv.typ = sc.getType("int")
+				}
+			}
+			if n.anc != nil && n.anc.kind == forStmt7 {
+				lv := n.child[0]
+				init := n.anc.child[0]
+				if init.kind == defineStmt && len(init.child) >= 2 && init.child[0].kind == identExpr {
+					fi := init.child[0]
+					lv.ident = fi.ident
+					lv.typ = fi.typ
+					vindex := sc.add(lv.typ)
+					sc.sym[lv.ident] = &symbol{index: fi.findex, kind: varSym, typ: lv.typ}
+					lv.findex = vindex
+					lv.gen = loopVarFor
 				}
 			}
 
@@ -1621,14 +1628,15 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			} else {
 				init.tnext = cond.start
 				post.tnext = cond.start
+				body.start = body.child[0] // loopvar
 			}
 			cond.tnext = body.start
 			setFNext(cond, n)
 			body.tnext = post.start
+			tracePrintTree(n, "for7")
 			sc = sc.pop()
 
 		case forRangeStmt:
-			tracePrintTree(n, "for range")
 			n.start = n.child[0].start
 			setFNext(n.child[0], n)
 			sc = sc.pop()

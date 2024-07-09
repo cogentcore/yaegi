@@ -246,9 +246,47 @@ func main() {
 		println(i, &i)
 		fs = append(fs, func() { println(i, &i) })
 	}
-	for j := 0; j < len(fs); j++ {
-		f := fs[j]
+	for _, f := range fs {
 		f()
+	}
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestForLoopClosure(t *testing.T) {
+	i := New(Options{})
+	_, err := i.Eval(`
+func main() {
+	fs := []func()
+	for i := 0; i < 3; i++ {
+		println(i)
+		f := func() { println(i) }
+		fs = append(fs, f)
+	}
+	for _, f := range fs {
+		f()
+	}
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestForLoopAddr(t *testing.T) {
+	i := New(Options{})
+	_, err := i.Eval(`
+func main() {
+	is := []*int
+	for i := 0; i < 3; i++ {
+		is = append(is, &i)
+		println(i)
+	}
+	for _, j := range is {
+		println(*j)
 	}
 }
 `)

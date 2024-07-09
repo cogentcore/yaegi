@@ -2886,9 +2886,9 @@ func rangeInt(n *node) {
 	mxn := n.child[1]
 	value = genValue(mxn)
 	n.exec = func(f *frame) bltn {
-		v0 := f.data[index0]
-		v0.SetInt(v0.Int() + 1)
-		if int(v0.Int()) >= int(f.data[index2].Int()) {
+		rv := f.data[index0]
+		rv.SetInt(rv.Int() + 1)
+		if int(rv.Int()) >= int(f.data[index2].Int()) {
 			return fnext
 		}
 		return tnext
@@ -2908,9 +2908,9 @@ func loopVarKey(n *node) {
 	ixn := n.anc.anc.child[0]
 	next := getExec(n.tnext)
 	n.exec = func(f *frame) bltn {
-		lv := f.data[ixn.findex]
-		nv := reflect.New(lv.Type()).Elem()
-		nv.Set(lv)
+		rv := f.data[ixn.findex]
+		nv := reflect.New(rv.Type()).Elem()
+		nv.Set(rv)
 		f.data[n.findex] = nv
 		return next
 	}
@@ -2920,9 +2920,21 @@ func loopVarVal(n *node) {
 	vln := n.anc.anc.child[1]
 	next := getExec(n.tnext)
 	n.exec = func(f *frame) bltn {
-		lv := f.data[vln.findex]
-		nv := reflect.New(lv.Type()).Elem()
-		nv.Set(lv)
+		rv := f.data[vln.findex]
+		nv := reflect.New(rv.Type()).Elem()
+		nv.Set(rv)
+		f.data[n.findex] = nv
+		return next
+	}
+}
+
+func loopVarFor(n *node) {
+	ixn := n.anc.anc.child[0].child[0]
+	next := getExec(n.tnext)
+	n.exec = func(f *frame) bltn {
+		fv := f.data[ixn.findex]
+		nv := reflect.New(fv.Type()).Elem()
+		nv.Set(fv)
 		f.data[n.findex] = nv
 		return next
 	}
