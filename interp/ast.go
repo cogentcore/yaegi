@@ -597,7 +597,14 @@ func (interp *Interpreter) ast(f ast.Node) (string, *node, error) {
 			st.push(addChild(&root, anc, pos, kind, act), nod)
 
 		case *ast.BlockStmt:
-			st.push(addChild(&root, anc, pos, blockStmt, aNop), nod)
+			b := addChild(&root, anc, pos, blockStmt, aNop)
+			st.push(b, nod)
+			if anc.node.kind == rangeStmt {
+				fmt.Println("adding per-loop vars")
+				// add k, v per-loop vars
+				addChild(&root, astNode{b, nod}, pos, identExpr, aNop)
+				addChild(&root, astNode{b, nod}, pos, identExpr, aNop)
+			}
 
 		case *ast.BranchStmt:
 			var kind nkind

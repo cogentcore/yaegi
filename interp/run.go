@@ -2876,8 +2876,9 @@ func _range(n *node) {
 }
 
 func rangeInt(n *node) {
-	index0 := n.child[0].findex // array index location in frame
-	index2 := index0 - 1        // max
+	ixn := n.child[0]
+	index0 := ixn.findex // array index location in frame
+	index2 := index0 - 1 // max
 	fnext := getExec(n.fnext)
 	tnext := getExec(n.tnext)
 
@@ -2887,6 +2888,7 @@ func rangeInt(n *node) {
 	n.exec = func(f *frame) bltn {
 		v0 := f.data[index0]
 		v0.SetInt(v0.Int() + 1)
+		fmt.Println("v0:", v0.Int())
 		if int(v0.Int()) >= int(f.data[index2].Int()) {
 			return fnext
 		}
@@ -2896,9 +2898,20 @@ func rangeInt(n *node) {
 	// Init sequence
 	next := n.exec
 	index := index0
-	n.child[0].exec = func(f *frame) bltn {
+	ixn.exec = func(f *frame) bltn {
 		f.data[index2] = value(f) // set max
 		f.data[index].SetInt(-1)  // assing index value
+		return next
+	}
+}
+
+func loopVarKey(n *node) {
+	ixn := n.anc.anc.child[0]
+	next := getExec(n.tnext)
+	n.exec = func(f *frame) bltn {
+		ki := f.anc.data[ixn.findex].Int()
+		tracePrintln(n, ki, "lkidx:", n.findex)
+		f.data[n.findex].SetInt(ki)
 		return next
 	}
 }

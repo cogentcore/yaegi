@@ -53,7 +53,7 @@ func init() {
 }
 
 // set trace to true for debugging the cfg and other processes
-var trace = false
+var trace = true
 
 func traceIndent(n *node) string {
 	return strings.Repeat("  ", n.depth())
@@ -149,6 +149,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			}
 
 		case blockStmt:
+			var rangek, rangev *node
 			if n.anc != nil && n.anc.kind == rangeStmt {
 				// For range block: ensure that array or map type is propagated to iterators
 				// prior to process block. We cannot perform this at RangeStmt pre-order because
@@ -232,7 +233,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 						vtyp = o.typ.val
 					case intT:
 						n.anc.gen = rangeInt
-						tracePrintTree(n.anc, "for range value")
 						sc.add(sc.getType("int"))
 						ktyp = sc.getType("int")
 					}
@@ -241,12 +241,14 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					sc.sym[k.ident] = &symbol{index: kindex, kind: varSym, typ: ktyp}
 					k.typ = ktyp
 					k.findex = kindex
+					rangek = k
 
 					if v != nil {
 						vindex := sc.add(vtyp)
 						sc.sym[v.ident] = &symbol{index: vindex, kind: varSym, typ: vtyp}
 						v.typ = vtyp
 						v.findex = vindex
+						rangev = v
 					}
 				}
 			}
@@ -254,6 +256,34 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			n.findex = -1
 			n.val = nil
 			sc = sc.pushBloc()
+
+			if n.anc != nil && n.anc.kind == rangeStmt {
+				lk := n.child[0]
+				if rangek != nil {
+					lk.ident = rangek.ident
+					lk.typ = rangek.typ
+					kindex := sc.add(lk.typ)
+					sc.sym[lk.ident] = &symbol{index: kindex, kind: varSym, typ: lk.typ}
+					lk.findex = kindex
+					lk.gen = loopVarKey
+					tracePrintTree(n.anc, "for range loop vars")
+				} else {
+					lk.ident = "_"
+					lk.typ = sc.getType("int")
+				}
+				lv := n.child[1]
+				if rangev != nil {
+					lv.ident = rangev.ident
+					lv.typ = rangev.typ
+					vindex := sc.add(lv.typ)
+					sc.sym[lv.ident] = &symbol{index: vindex, kind: varSym, typ: lv.typ}
+					lv.findex = vindex
+				} else {
+					lv.ident = "_"
+					lv.typ = sc.getType("int")
+				}
+			}
+
 			// Pre-define symbols for labels defined in this block, so we are sure that
 			// they are already defined when met.
 			// TODO(marc): labels must be stored outside of symbols to avoid collisions.
