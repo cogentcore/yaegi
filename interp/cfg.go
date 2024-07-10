@@ -1382,11 +1382,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					var found bool
 
 					// Infer type parameter from function call arguments.
-					args := n.child[1:]
-					if len(args) == 0 {
-						args = n.child[0].child[1:] // use explicit type params
-					}
-					if types, err = inferTypesFromCall(sc, fun, args); err != nil {
+					if types, err = inferTypesFromCall(sc, fun, n.child[1:]); err != nil {
 						interp.abortErr = err
 						break
 					}

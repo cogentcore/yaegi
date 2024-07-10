@@ -292,28 +292,13 @@ func inferTypesFromCall(sc *scope, fun *node, args []*node) ([]*itype, error) {
 	}
 
 	types := []*itype{}
-	if len(args) == 0 {
-		err := ftn.cfgErrorf("generic function type infer: no args")
-		return types, err
-	}
-	var kids []*node
-	if len(ftn.child[1].child) == 0 && len(ftn.child[0].child[0].child) > 1 {
-		kids = ftn.child[0].child // if no args, use type parameters
-	} else {
-		kids = ftn.child[1].child // first args
-	}
-	if len(kids) == 0 {
-		err := ftn.cfgErrorf("generic function type infer: no children")
-		return types, err
-	}
-
-	for i, c := range kids {
+	for i, c := range ftn.child[1].child {
 		typ, err := nodeType(fun.interp, sc, c.lastChild())
 		if err != nil {
 			return nil, err
 		}
 		if i >= len(args) {
-			err = ftn.cfgErrorf("generic functions do not yet support variadic args")
+			err = ftn.cfgErrorf("passed more args than generic function accepts")
 			return nil, err
 		}
 		lt, err := inferTypes(typ, args[i].typ)
