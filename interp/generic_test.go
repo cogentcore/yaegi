@@ -1,8 +1,11 @@
 package interp
 
 import (
+	"go/build"
 	"reflect"
 	"testing"
+
+	"github.com/traefik/yaegi/stdlib"
 )
 
 func TestGenericFuncDeclare(t *testing.T) {
@@ -360,6 +363,28 @@ func main() {
 	for _, f := range fs {
 		f()
 	}
+}
+`)
+	if err != nil {
+		t.Error(err)
+	}
+}
+
+func TestMisc(t *testing.T) {
+	i := New(Options{GoPath: build.Default.GOPATH})
+	if err := i.Use(stdlib.Symbols); err != nil {
+		t.Fatal(err)
+	}
+	_, err := i.Eval(`
+package main
+import (
+	"fmt"
+	"net"
+)
+func main() {
+	addr := net.TCPAddr{IP: net.IPv4(1, 1, 1, 1), Port: 80}
+	var s fmt.Stringer = &addr
+	fmt.Println(s.String())
 }
 `)
 	if err != nil {
