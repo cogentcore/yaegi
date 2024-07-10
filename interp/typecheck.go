@@ -969,7 +969,6 @@ func (check typecheck) arguments(n *node, child []*node, fun *node, ellipsis boo
 
 	if fun.typ == nil {
 		err := fun.cfgErrorf("typecheck arguments: nil function type: likely a syntax error above this point")
-		tracePrintln(fun, err)
 		return err
 	}
 	var cnt int
