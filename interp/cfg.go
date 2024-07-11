@@ -1629,7 +1629,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			cond.tnext = body.start
 			setFNext(cond, n)
 			body.tnext = post.start
-			tracePrintTree(n, "for7")
 			sc = sc.pop()
 
 		case forRangeStmt:
