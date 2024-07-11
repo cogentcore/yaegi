@@ -720,10 +720,8 @@ func assign(n *node) {
 			ind := n.findex
 			n.exec = func(f *frame) bltn {
 				data := getFrame(f, l).data
-				ov := s(f)
-				nv := reflect.New(ov.Type()).Elem()
-				nv.Set(ov)
-				data[ind] = nv
+				data[ind] = reflect.New(data[ind].Type()).Elem()
+				data[ind].Set(s(f))
 				return next
 			}
 		default:
