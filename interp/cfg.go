@@ -53,7 +53,7 @@ func init() {
 }
 
 // set trace to true for debugging the cfg and other processes
-var trace = true
+var trace = false
 
 func traceIndent(n *node) string {
 	return strings.Repeat("  ", n.depth())
