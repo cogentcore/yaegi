@@ -247,7 +247,7 @@ func main() {
 	fs := []func()
 	for i := range 3 {
 		println(i, &i)
-		fs = append(fs, func() { println(i, &i) })
+		fs = append(fs, func() { println(i) })
 	}
 	for _, f := range fs {
 		f()

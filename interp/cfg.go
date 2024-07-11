@@ -283,7 +283,7 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					lv.ident = fi.ident
 					lv.typ = fi.typ
 					vindex := sc.add(lv.typ)
-					sc.sym[lv.ident] = &symbol{index: fi.findex, kind: varSym, typ: lv.typ}
+					sc.sym[lv.ident] = &symbol{index: vindex, kind: varSym, typ: lv.typ}
 					lv.findex = vindex
 					lv.gen = loopVarFor
 				}
@@ -1629,7 +1629,6 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 			cond.tnext = body.start
 			setFNext(cond, n)
 			body.tnext = post.start
-			tracePrintTree(n, "for7")
 			sc = sc.pop()
 
 		case forRangeStmt:
