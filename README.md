@@ -11,7 +11,7 @@ It powers executable Go scripts and plugins, in embedded interpreters or interac
 
 ## Features
 
-* Complete support of [Go specification][specs]
+* Complete support of [Go specification][specs], up to Go v1.22
 * Written in pure Go, using only the standard library
 * Simple interpreter API: `New()`, `Eval()`, `Use()`
 * Works everywhere Go works
