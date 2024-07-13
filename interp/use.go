@@ -102,10 +102,14 @@ func getWrapper(n *node, t reflect.Type) reflect.Type {
 
 // Use loads binary runtime symbols in the interpreter context so
 // they can be used in interpreted code.
+// Use "." for the package path to directly import variables into
+// the interpreter package scope, so they can be referred to as if
+// they were declared using `var` statements.
 func (interp *Interpreter) Use(values Exports) error {
 	for k, v := range values {
 		importPath := path.Dir(k)
 		packageName := path.Base(k)
+		// fmt.Println(importPath, packageName)
 
 		if k == "." && v["MapTypes"].IsValid() {
 			// Use mapping for special interface wrappers.
@@ -114,9 +118,17 @@ func (interp *Interpreter) Use(values Exports) error {
 			}
 			continue
 		}
+		if k == "." { // inject variables directly into local namespace
+			sc := interp.universe
+			for sk, sv := range v {
+				typ := valueTOf(sv.Type())
+				sc.sym[sk] = &symbol{kind: binSym, typ: typ, rval: sv}
+			}
+			continue
+		}
 
 		if importPath == "." {
-			return fmt.Errorf("export path %[1]q is missing a package name; did you mean '%[1]s/%[1]s'?", k)
+			// return fmt.Errorf("export path %[1]q is missing a package name; did you mean '%[1]s/%[1]s'?", k)
 		}
 
 		if importPath == selfPrefix {
