@@ -1,6 +1,6 @@
-module github.com/traefik/yaegi
+module github.com/cogentcore/yaegi
 
-go 1.21
+go 1.22
 
 require golang.org/x/tools v0.22.0
 
