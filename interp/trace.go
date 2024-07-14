@@ -40,7 +40,7 @@ func tracePrintTree(n *node, v ...any) {
 // nodeAddr returns the pointer address of node, short version.
 func ptrAddr(v any) string {
 	p := fmt.Sprintf("%p", v)
-	return p[:2] + p[9:] // unique bits
+	return p[:2] + p[8:] // unique bits
 }
 
 // valString returns string rep of given value, showing underlying pointers etc.
@@ -51,7 +51,7 @@ func valString(v reflect.Value) string {
 	if v.Kind() == reflect.Func || v.Kind() == reflect.Map || v.Kind() == reflect.Pointer || v.Kind() == reflect.Slice || v.Kind() == reflect.UnsafePointer {
 		p := fmt.Sprintf("%#x", v.Pointer())
 		ln := len(p)
-		s += " " + p[:2] + p[max(2, ln-4):]
+		s += " " + p[:2] + p[max(2, ln-5):]
 	}
 	return s
 }
