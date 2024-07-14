@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/traefik/yaegi/internal/unsafe2"
+	"github.com/cogentcore/yaegi/internal/unsafe2"
 )
 
 // tcat defines interpreter type categories.

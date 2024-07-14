@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"sync"
-
-	"github.com/traefik/yaegi/_test/method38"
 )
 
 func NewPool() Pool { return Pool{} }
@@ -22,7 +20,6 @@ var (
 	_pool = NewPool()
 	Get   = _pool.Get
 )
-
 
 func main() {
 	fmt.Println(Get())

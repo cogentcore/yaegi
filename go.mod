@@ -1,5 +1,4 @@
 module github.com/cogentcore/yaegi
-// module github.com/traefik/yaegi
 
 go 1.22
 
