@@ -146,6 +146,7 @@ func (interp *Interpreter) Execute(p *Program) (res reflect.Value, err error) {
 			err = Panic{Value: r, Callers: pc[:n], Stack: debug.Stack()}
 		}
 	}()
+	interp.id = 0 // restart fresh!
 
 	// Generate node exec closures.
 	if err = genRun(p.root); err != nil {
