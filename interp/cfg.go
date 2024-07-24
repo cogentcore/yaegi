@@ -691,6 +691,14 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 				sbase = len(n.child) - n.nright
 			}
 
+			// If len(RHS) > 1, each node must be single-valued, and the nth expression
+			// on the right is assigned to the nth operand on the left, so the number of
+			// nodes on the left and right sides must be equal
+			if n.nright > 1 && n.nright != n.nleft {
+				err = n.cfgErrorf("cannot assign %d values to %d variables", n.nright, n.nleft)
+				return
+			}
+
 			wireChild(n)
 			for i := 0; i < n.nleft; i++ {
 				dest, src := n.child[i], n.child[sbase+i]
@@ -725,7 +733,23 @@ func (interp *Interpreter) cfg(root *node, sc *scope, importPath, pkgName string
 					if dest.typ.incomplete {
 						return
 					}
-					if sc.global {
+					if sc.global || sc.isRedeclared(dest) {
+						if n.anc != nil && n.anc.anc != nil && (n.anc.anc.kind == forStmt7 || n.anc.anc.kind == rangeStmt) {
+							// check for redefine of for loop variables, which are now auto-defined in go1.22
+							init := n.anc.anc.child[0]
+							var fi *node // for ident
+							if n.anc.anc.kind == forStmt7 {
+								if init.kind == defineStmt && len(init.child) >= 2 && init.child[0].kind == identExpr {
+									fi = init.child[0]
+								}
+							} else { // range
+								fi = init
+							}
+							if fi != nil && dest.ident == fi.ident {
+								n.gen = nop
+								break
+							}
+						}
 						// Do not overload existing symbols (defined in GTA) in global scope.
 						sym, _, _ = sc.lookup(dest.ident)
 					}
