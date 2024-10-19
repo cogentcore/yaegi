@@ -45,6 +45,7 @@ func main() {
 	if err != nil {
 		t.Error(err)
 	}
+
 	// read stdout
 	if err = w.Close(); err != nil {
 		t.Fatal(err)

@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/traefik/yaegi/_test/method38"
+	"github.com/cogentcore/yaegi/_test/method38"
 )
 
 func main() {

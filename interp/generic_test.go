@@ -184,6 +184,7 @@ func main() {
 	}
 }
 
+
 // this one failed without more robust arg type matching in generic.go:300.
 func TestGenericFuncIgnoreError(t *testing.T) {
 	i := New(Options{})

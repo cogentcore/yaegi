@@ -132,7 +132,7 @@ func (W _guthib_com_variadic_Variadic) Call(method string, args ...[]interface{}
 package generic
 
 import (
-	"github.com/traefik/yaegi/interp"
+	"github.com/cogentcore/yaegi/interp"
 	"guthib.com/generic"
 	"reflect"
 )
