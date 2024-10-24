@@ -1,4 +1,4 @@
-module github.com/cogentcore/yaegi
+module github.com/breadchris/yaegi
 
 go 1.22
 

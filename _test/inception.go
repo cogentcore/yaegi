@@ -3,14 +3,14 @@ package main
 import (
 	"log"
 
-	"github.com/cogentcore/yaegi/interp"
+	"github.com/breadchris/yaegi/interp"
 )
 
 func main() {
 	log.SetFlags(log.Lshortfile)
 	i := interp.New(interp.Options{})
 	i.Use(interp.Symbols)
-	if _, err := i.Eval(`import "github.com/cogentcore/yaegi/interp"`); err != nil {
+	if _, err := i.Eval(`import "github.com/breadchris/yaegi/interp"`); err != nil {
 		log.Fatal(err)
 	}
 	if _, err := i.Eval(`i := interp.New(interp.Options{})`); err != nil {

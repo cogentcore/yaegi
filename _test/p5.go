@@ -1,6 +1,6 @@
 package main
 
-import "github.com/cogentcore/yaegi/_test/p5"
+import "github.com/breadchris/yaegi/_test/p5"
 
 func main() {
 	println(*p5.Value1)

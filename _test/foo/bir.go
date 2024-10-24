@@ -1,5 +1,5 @@
 package foo
 
-import "github.com/cogentcore/yaegi/_test/foo/boo"
+import "github.com/breadchris/yaegi/_test/foo/boo"
 
 var Bir = boo.Boo + "22"

@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cogentcore/yaegi/interp"
-	"github.com/cogentcore/yaegi/stdlib"
-	"github.com/cogentcore/yaegi/stdlib/unsafe"
+	"github.com/breadchris/yaegi/interp"
+	"github.com/breadchris/yaegi/stdlib"
+	"github.com/breadchris/yaegi/stdlib/unsafe"
 )
 
 var testsToSkipGo122 = map[string]bool{}

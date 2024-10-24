@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cogentcore/yaegi/extract"
+	"github.com/breadchris/yaegi/extract"
 )
 
 func extractCmd(arg []string) error {

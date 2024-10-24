@@ -24,7 +24,7 @@ linters-settings:
           - $all
         allow:
           - $gostd
-          - github.com/cogentcore/yaegi
+          - github.com/breadchris/yaegi
   tagalign:
     align: false
     order:

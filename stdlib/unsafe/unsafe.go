@@ -10,10 +10,10 @@ import (
 var Symbols = map[string]map[string]reflect.Value{}
 
 func init() {
-	Symbols["github.com/cogentcore/yaegi/stdlib/unsafe/unsafe"] = map[string]reflect.Value{
+	Symbols["github.com/breadchris/yaegi/stdlib/unsafe/unsafe"] = map[string]reflect.Value{
 		"Symbols": reflect.ValueOf(Symbols),
 	}
-	Symbols["github.com/cogentcore/yaegi/yaegi"] = map[string]reflect.Value{
+	Symbols["github.com/breadchris/yaegi/yaegi"] = map[string]reflect.Value{
 		"convert": reflect.ValueOf(convert),
 	}
 

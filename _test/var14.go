@@ -1,6 +1,6 @@
 package main
 
-import "github.com/cogentcore/yaegi/_test/vars"
+import "github.com/breadchris/yaegi/_test/vars"
 
 func main() {
 	println(vars.A)

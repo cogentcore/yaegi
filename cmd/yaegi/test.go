@@ -12,11 +12,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cogentcore/yaegi/interp"
-	"github.com/cogentcore/yaegi/stdlib"
-	"github.com/cogentcore/yaegi/stdlib/syscall"
-	"github.com/cogentcore/yaegi/stdlib/unrestricted"
-	"github.com/cogentcore/yaegi/stdlib/unsafe"
+	"github.com/breadchris/yaegi/interp"
+	"github.com/breadchris/yaegi/stdlib"
+	"github.com/breadchris/yaegi/stdlib/syscall"
+	"github.com/breadchris/yaegi/stdlib/unrestricted"
+	"github.com/breadchris/yaegi/stdlib/unsafe"
 )
 
 func test(arg []string) (err error) {

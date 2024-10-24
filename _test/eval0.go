@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/cogentcore/yaegi/interp"
+	"github.com/breadchris/yaegi/interp"
 )
 
 func main() {
