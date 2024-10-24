@@ -2,9 +2,9 @@
 <img width="400" src="doc/images/yaegi.png" alt="Yaegi" title="Yaegi" />
 </p>
 
-[![release](https://img.shields.io/github/tag-date/traefik/yaegi.svg?label=alpha)](https://github.com/breadchris/yaegi/releases)
-[![Build Status](https://github.com/breadchris/yaegi/actions/workflows/main.yml/badge.svg)](https://github.com/breadchris/yaegi/actions/workflows/main.yml)
-[![GoDoc](https://godoc.org/github.com/breadchris/yaegi?status.svg)](https://pkg.go.dev/mod/github.com/breadchris/yaegi)
+[![release](https://img.shields.io/github/tag-date/traefik/yaegi.svg?label=alpha)](https://github.com/traefik/yaegi/releases)
+[![Build Status](https://github.com/traefik/yaegi/actions/workflows/main.yml/badge.svg)](https://github.com/traefik/yaegi/actions/workflows/main.yml)
+[![GoDoc](https://godoc.org/github.com/traefik/yaegi?status.svg)](https://pkg.go.dev/mod/github.com/traefik/yaegi)
 
 Yaegi is Another Elegant Go Interpreter.
 It powers executable Go scripts and plugins, in embedded interpreters or interactive shells, on top of the Go runtime.
@@ -24,13 +24,13 @@ It powers executable Go scripts and plugins, in embedded interpreters or interac
 ### Go package
 
 ```go
-import "github.com/breadchris/yaegi/interp"
+import "github.com/traefik/yaegi/interp"
 ```
 
 ### Command-line executable
 
 ```bash
-go install github.com/breadchris/yaegi/cmd/yaegi@latest
+go install github.com/traefik/yaegi/cmd/yaegi@latest
 ```
 
 Note that you can use [rlwrap](https://github.com/hanslub42/rlwrap) (install with your favorite package manager),
@@ -52,8 +52,8 @@ Create an interpreter with `New()`, run Go code with `Eval()`:
 package main
 
 import (
-	"github.com/breadchris/yaegi/interp"
-	"github.com/breadchris/yaegi/stdlib"
+	"github.com/traefik/yaegi/interp"
+	"github.com/traefik/yaegi/stdlib"
 )
 
 func main() {
@@ -86,7 +86,7 @@ The following program is compiled ahead of time, except `bar()` which is interpr
 ```go
 package main
 
-import "github.com/breadchris/yaegi/interp"
+import "github.com/traefik/yaegi/interp"
 
 const src = `package foo
 func Bar(s string) string { return s + "-Foo" }`
@@ -140,7 +140,7 @@ $ yaegi
 Or interpret Go packages, directories or files, including itself:
 
 ```console
-$ yaegi -syscall -unsafe -unrestricted github.com/breadchris/yaegi/cmd/yaegi
+$ yaegi -syscall -unsafe -unrestricted github.com/traefik/yaegi/cmd/yaegi
 >
 ```
 
@@ -179,7 +179,7 @@ Beside the known [bugs] which are supposed to be fixed in the short term, there 
 - Representation of types by `reflect` and printing values using %T may give different results between compiled mode and interpreted mode.
 - Interpreting computation intensive code is likely to remain significantly slower than in compiled mode.
 
-Go modules are not supported yet. Until that, it is necessary to install the source into `$GOPATH/src/github.com/breadchris/yaegi` to pass all the tests.
+Go modules are not supported yet. Until that, it is necessary to install the source into `$GOPATH/src/github.com/traefik/yaegi` to pass all the tests.
 
 ## Contributing
 
@@ -190,7 +190,7 @@ Go modules are not supported yet. Until that, it is necessary to install the sou
 [Apache 2.0][License].
 
 [specs]: https://golang.org/ref/spec
-[docs]: https://pkg.go.dev/github.com/breadchris/yaegi
-[license]: https://github.com/breadchris/yaegi/blob/master/LICENSE
-[github]: https://github.com/breadchris/yaegi
-[bugs]: https://github.com/breadchris/yaegi/issues?q=is%3Aissue+is%3Aopen+label%3Abug
+[docs]: https://pkg.go.dev/github.com/traefik/yaegi
+[license]: https://github.com/traefik/yaegi/blob/master/LICENSE
+[github]: https://github.com/traefik/yaegi
+[bugs]: https://github.com/traefik/yaegi/issues?q=is%3Aissue+is%3Aopen+label%3Abug

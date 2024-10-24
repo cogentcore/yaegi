@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/breadchris/yaegi/stdlib"
+	"github.com/traefik/yaegi/stdlib"
 )
 
 func init() { log.SetFlags(log.Lshortfile) }

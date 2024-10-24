@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: ${{ github.workspace }}/go/src/github.com/breadchris/yaegi
+        working-directory: ${{ github.workspace }}/go/src/github.com/traefik/yaegi
 
     strategy:
       matrix:
@@ -33,7 +33,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          path: go/src/github.com/breadchris/yaegi
+          path: go/src/github.com/traefik/yaegi
 
       # https://github.com/marketplace/actions/setup-go-environment
       - name: Set up Go ${{ matrix.go-version }}

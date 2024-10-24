@@ -1,6 +1,6 @@
 package main
 
-import "github.com/breadchris/yaegi/_test/named3"
+import "github.com/traefik/yaegi/_test/named3"
 
 var globalT *T
 

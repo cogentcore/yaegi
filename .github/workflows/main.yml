@@ -73,7 +73,7 @@ jobs:
     needs: linting
     defaults:
       run:
-        working-directory: ${{ github.workspace }}/go/src/github.com/breadchris/yaegi
+        working-directory: ${{ github.workspace }}/go/src/github.com/traefik/yaegi
     strategy:
       matrix:
         go-version: [ oldstable, stable ]
@@ -82,7 +82,7 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
         with:
-          path: go/src/github.com/breadchris/yaegi
+          path: go/src/github.com/traefik/yaegi
           fetch-depth: 0
 
       - name: Set up Go ${{ matrix.go-version }}

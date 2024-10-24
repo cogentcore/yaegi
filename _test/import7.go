@@ -1,6 +1,6 @@
 package main
 
-import bar "github.com/breadchris/yaegi/_test/foo-bar"
+import bar "github.com/traefik/yaegi/_test/foo-bar"
 
 func main() {
 	println(bar.Name)

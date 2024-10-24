@@ -1,6 +1,6 @@
 package main
 
-import "github.com/breadchris/yaegi/_test/p2"
+import "github.com/traefik/yaegi/_test/p2"
 
 func f(i interface{}) {
 	_, ok := i.(p2.I)

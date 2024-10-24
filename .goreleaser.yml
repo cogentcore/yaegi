@@ -54,7 +54,7 @@ brews:
       name: traefiker
       email: 30906710+traefiker@users.noreply.github.com
     folder: Formula
-    homepage: https://github.com/breadchris/yaegi
+    homepage: https://github.com/traefik/yaegi
     description: |
       Yaegi is Another Elegant Go Interpreter.
       It powers executable Go scripts and plugins, in embedded interpreters

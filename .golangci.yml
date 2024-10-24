@@ -24,7 +24,7 @@ linters-settings:
           - $all
         allow:
           - $gostd
-          - github.com/breadchris/yaegi
+          - github.com/traefik/yaegi
   tagalign:
     align: false
     order:

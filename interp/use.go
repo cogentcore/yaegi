@@ -10,7 +10,7 @@ import (
 	"path"
 	"reflect"
 
-	gen "github.com/breadchris/yaegi/stdlib/generic"
+	gen "github.com/traefik/yaegi/stdlib/generic"
 )
 
 // Symbols returns a map of interpreter exported symbol values for the given

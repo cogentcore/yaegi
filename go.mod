@@ -1,4 +1,4 @@
-module github.com/breadchris/yaegi
+module github.com/traefik/yaegi
 
 go 1.22
 

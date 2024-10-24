@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/breadchris/yaegi/internal/unsafe2"
+	"github.com/traefik/yaegi/internal/unsafe2"
 )
 
 func TestSwapFieldType(t *testing.T) {
