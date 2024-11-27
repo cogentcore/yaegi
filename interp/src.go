@@ -1,6 +1,7 @@
 package interp
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -132,6 +133,11 @@ func (interp *Interpreter) importSrc(rPath, importPath string, skipTest bool) (s
 	// the global symbols in the package scope.
 	interp.mutex.Lock()
 	gs := interp.scopes[importPath]
+	if gs == nil {
+		interp.mutex.Unlock()
+		// A nil scope means that no even an empty package is created from source.
+		return "", fmt.Errorf("no Go files in %s", dir)
+	}
 	interp.srcPkg[importPath] = gs.sym
 	interp.pkgNames[importPath] = pkgName
 
@@ -203,7 +209,7 @@ func (interp *Interpreter) pkgDir(goPath string, root, importPath string) (strin
 		return dir, root, nil // found!
 	}
 
-	if len(root) == 0 {
+	if root == "" {
 		if interp.context.GOPATH == "" {
 			return "", "", fmt.Errorf("unable to find source related to: %q. Either the GOPATH environment variable, or the Interpreter.Options.GoPath needs to be set", importPath)
 		}
@@ -240,8 +246,12 @@ func previousRoot(filesystem fs.FS, rootPath, root string) (string, error) {
 				vendored = strings.TrimPrefix(strings.TrimPrefix(parent, prefix), string(filepath.Separator))
 				break
 			}
-			if !os.IsNotExist(err) {
+			if !errors.Is(err, fs.ErrNotExist) {
 				return "", err
+			}
+			// stop when we reach GOPATH/src
+			if parent == prefix {
+				break
 			}
 
 			// stop when we reach GOPATH/src/blah
@@ -254,7 +264,8 @@ func previousRoot(filesystem fs.FS, rootPath, root string) (string, error) {
 			// we are dealing with relative paths).
 			// TODO(mpl): It should probably be a critical error actually,
 			// as we shouldn't have gone that high up in the tree.
-			if parent == string(filepath.Separator) || parent == "." {
+			// TODO(dennwc): This partially fails on Windows, since it cannot recognize drive letters as "root".
+			if parent == string(filepath.Separator) || parent == "." || parent == "" {
 				break
 			}
 		}

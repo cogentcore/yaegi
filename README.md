@@ -5,20 +5,19 @@
 [![release](https://img.shields.io/github/tag-date/traefik/yaegi.svg?label=alpha)](https://github.com/traefik/yaegi/releases)
 [![Build Status](https://github.com/traefik/yaegi/actions/workflows/main.yml/badge.svg)](https://github.com/traefik/yaegi/actions/workflows/main.yml)
 [![GoDoc](https://godoc.org/github.com/traefik/yaegi?status.svg)](https://pkg.go.dev/mod/github.com/traefik/yaegi)
-[![Discourse status](https://img.shields.io/discourse/https/community.traefik.io/status?label=Community&style=social)](https://community.traefik.io/c/yaegi)
 
 Yaegi is Another Elegant Go Interpreter.
 It powers executable Go scripts and plugins, in embedded interpreters or interactive shells, on top of the Go runtime.
 
 ## Features
 
-* Complete support of [Go specification][specs]
+* Complete support of [Go specification][specs], up to Go v1.22
 * Written in pure Go, using only the standard library
 * Simple interpreter API: `New()`, `Eval()`, `Use()`
 * Works everywhere Go works
 * All Go & runtime resources accessible from script (with control)
 * Security: `unsafe` and `syscall` packages neither used nor exported by default
-* Support Go 1.16 and Go 1.17 (the latest 2 major releases)
+* Support the latest 2 major releases of Go (Go 1.21 and Go 1.22)
 
 ## Install
 
@@ -31,7 +30,7 @@ import "github.com/traefik/yaegi/interp"
 ### Command-line executable
 
 ```bash
-go get -u github.com/traefik/yaegi/cmd/yaegi
+go install github.com/traefik/yaegi/cmd/yaegi@latest
 ```
 
 Note that you can use [rlwrap](https://github.com/hanslub42/rlwrap) (install with your favorite package manager),
@@ -167,15 +166,20 @@ test
 
 Documentation about Yaegi commands and libraries can be found at usual [godoc.org][docs].
 
+Key documentation of the internal design: https://marc.vertes.org/yaegi-internals/  Also see [interp/trace.go](interp/trace.go) for helpful printing commands to see what is happening under the hood during compilation.
+
 ## Limitations
 
 Beside the known [bugs] which are supposed to be fixed in the short term, there are some limitations not planned to be addressed soon:
 
 - Assembly files (`.s`) are not supported.
 - Calling C code is not supported (no virtual "C" package).
+- Directives about the compiler, the linker, or embedding files are not supported.
 - Interfaces to be used from the pre-compiled code can not be added dynamically, as it is required to pre-compile interface wrappers.
 - Representation of types by `reflect` and printing values using %T may give different results between compiled mode and interpreted mode.
 - Interpreting computation intensive code is likely to remain significantly slower than in compiled mode.
+
+Go modules are not supported yet. Until that, it is necessary to install the source into `$GOPATH/src/github.com/traefik/yaegi` to pass all the tests.
 
 ## Contributing
 

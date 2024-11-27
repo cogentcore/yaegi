@@ -72,6 +72,7 @@ const (
 	importSpec
 	incDecStmt
 	indexExpr
+	indexListExpr
 	interfaceType
 	keyValueExpr
 	labeledStmt
@@ -155,6 +156,7 @@ var kinds = [...]string{
 	importSpec:        "importSpec",
 	incDecStmt:        "incDecStmt",
 	indexExpr:         "indexExpr",
+	indexListExpr:     "indexListExpr",
 	interfaceType:     "interfaceType",
 	keyValueExpr:      "keyValueExpr",
 	labeledStmt:       "labeledStmt",
@@ -282,6 +284,7 @@ var actions = [...]string{
 	aDec:          "--",
 	aEqual:        "==",
 	aGreater:      ">",
+	aGreaterEqual: ">=",
 	aGetFunc:      "getFunc",
 	aGetIndex:     "getIndex",
 	aGetMethod:    "getMethod",
@@ -290,6 +293,7 @@ var actions = [...]string{
 	aLand:         "&&",
 	aLor:          "||",
 	aLower:        "<",
+	aLowerEqual:   "<=",
 	aMethod:       "Method",
 	aMul:          "*",
 	aMulAssign:    "*=",
@@ -593,7 +597,22 @@ func (interp *Interpreter) ast(f ast.Node) (string, *node, error) {
 			st.push(addChild(&root, anc, pos, kind, act), nod)
 
 		case *ast.BlockStmt:
-			st.push(addChild(&root, anc, pos, blockStmt, aNop), nod)
+			b := addChild(&root, anc, pos, blockStmt, aNop)
+			st.push(b, nod)
+			var kind nkind
+			if anc.node != nil {
+				kind = anc.node.kind
+			}
+			switch kind {
+			case rangeStmt:
+				k := addChild(&root, astNode{b, nod}, pos, identExpr, aNop)
+				k.ident = "_"
+				v := addChild(&root, astNode{b, nod}, pos, identExpr, aNop)
+				v.ident = "_"
+			case forStmt7:
+				k := addChild(&root, astNode{b, nod}, pos, identExpr, aNop)
+				k.ident = "_"
+			}
 
 		case *ast.BranchStmt:
 			var kind nkind
@@ -692,7 +711,7 @@ func (interp *Interpreter) ast(f ast.Node) (string, *node, error) {
 			n := addChild(&root, anc, pos, funcDecl, aNop)
 			n.val = n
 			if a.Recv == nil {
-				// function is not a method, create an empty receiver list
+				// Function is not a method, create an empty receiver list.
 				addChild(&root, astNode{n, nod}, pos, fieldList, aNop)
 			}
 			st.push(n, nod)
@@ -704,7 +723,13 @@ func (interp *Interpreter) ast(f ast.Node) (string, *node, error) {
 			st.push(n, nod)
 
 		case *ast.FuncType:
-			st.push(addChild(&root, anc, pos, funcType, aNop), nod)
+			n := addChild(&root, anc, pos, funcType, aNop)
+			n.val = n
+			if a.TypeParams == nil {
+				// Function has no type parameters, create an empty fied list.
+				addChild(&root, astNode{n, nod}, pos, fieldList, aNop)
+			}
+			st.push(n, nod)
 
 		case *ast.GenDecl:
 			var kind nkind
@@ -773,6 +798,9 @@ func (interp *Interpreter) ast(f ast.Node) (string, *node, error) {
 
 		case *ast.IndexExpr:
 			st.push(addChild(&root, anc, pos, indexExpr, aGetIndex), nod)
+
+		case *ast.IndexListExpr:
+			st.push(addChild(&root, anc, pos, indexListExpr, aNop), nod)
 
 		case *ast.InterfaceType:
 			st.push(addChild(&root, anc, pos, interfaceType, aNop), nod)

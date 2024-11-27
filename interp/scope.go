@@ -11,15 +11,16 @@ type sKind uint
 
 // Symbol kinds for the Go interpreter.
 const (
-	undefSym sKind = iota
-	binSym         // Binary from runtime
-	bltnSym        // Builtin
-	constSym       // Constant
-	funcSym        // Function
-	labelSym       // Label
-	pkgSym         // Package
-	typeSym        // Type
-	varSym         // Variable
+	undefSym   sKind = iota
+	binSym           // Binary from runtime
+	bltnSym          // Builtin
+	constSym         // Constant
+	funcSym          // Function
+	labelSym         // Label
+	pkgSym           // Package
+	typeSym          // Type
+	varTypeSym       // Variable type (generic)
+	varSym           // Variable
 )
 
 // Signals from consumer to the depth first search
@@ -33,15 +34,16 @@ const (
 )
 
 var symKinds = [...]string{
-	undefSym: "undefSym",
-	binSym:   "binSym",
-	bltnSym:  "bltnSym",
-	constSym: "constSym",
-	funcSym:  "funcSym",
-	labelSym: "labelSym",
-	pkgSym:   "pkgSym",
-	typeSym:  "typeSym",
-	varSym:   "varSym",
+	undefSym:   "undefSym",
+	binSym:     "binSym",
+	bltnSym:    "bltnSym",
+	constSym:   "constSym",
+	funcSym:    "funcSym",
+	labelSym:   "labelSym",
+	pkgSym:     "pkgSym",
+	typeSym:    "typeSym",
+	varTypeSym: "varTypeSym",
+	varSym:     "varSym",
 }
 
 func (k sKind) String() string {
@@ -57,7 +59,7 @@ type symbol struct {
 	kind    sKind
 	typ     *itype        // Type of value
 	node    *node         // Node value if index is negative
-	from    []*node       // list of nodes jumping to node if kind is label, or nil
+	from    []*node       // list of goto nodes jumping to this label node, or nil
 	recv    *receiver     // receiver node value, if sym refers to a method
 	index   int           // index of value in frame or -1
 	rval    reflect.Value // default value (used for constants)
@@ -80,7 +82,6 @@ type symbol struct {
 //
 // In symbols, the index value corresponds to the index in scope.types, and at
 // execution to the index in frame, created exactly from the types layout.
-//
 type scope struct {
 	anc         *scope             // ancestor upper scope
 	child       []*scope           // included scopes
@@ -154,18 +155,12 @@ func (s *scope) lookup(ident string) (*symbol, int, bool) {
 	return nil, 0, false
 }
 
-// lookdown searches for a symbol in the current scope and included ones, recursively.
-// It returns the first found symbol and true, or nil and false.
-func (s *scope) lookdown(ident string) (*symbol, bool) {
-	if sym, ok := s.sym[ident]; ok {
-		return sym, true
+func (s *scope) isRedeclared(n *node) bool {
+	if !isNewDefine(n, s) {
+		return false
 	}
-	for _, c := range s.child {
-		if sym, ok := c.lookdown(ident); ok {
-			return sym, true
-		}
-	}
-	return nil, false
+	// Existing symbol in the scope indicates a redeclaration.
+	return s.sym[n.ident] != nil
 }
 
 func (s *scope) rangeChanType(n *node) *itype {
@@ -267,4 +262,27 @@ func (s *scope) dfs(f func(*scope) dfsSignal) dfsSignal {
 		}
 	}
 	return dfsDone
+}
+
+// Globals returns a map of global variables and constants in the main package.
+func (interp *Interpreter) Globals() map[string]reflect.Value {
+	syms := map[string]reflect.Value{}
+	interp.mutex.RLock()
+	defer interp.mutex.RUnlock()
+
+	v, ok := interp.srcPkg["main"]
+	if !ok {
+		return syms
+	}
+
+	for n, s := range v {
+		switch s.kind {
+		case constSym:
+			syms[n] = s.rval
+		case varSym:
+			syms[n] = interp.frame.data[s.index]
+		}
+	}
+
+	return syms
 }

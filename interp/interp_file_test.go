@@ -7,6 +7,8 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -15,22 +17,33 @@ import (
 	"github.com/traefik/yaegi/stdlib/unsafe"
 )
 
+// The following tests sometimes (not always) crash with go1.21 but not with go1.20 or go1.22.
+// The reason of failure is not obvious, maybe due to the runtime itself, and will be investigated separately.
+// Also, the closure tests depend on an incompatible language change in go1.22, where `for` variables are now
+// defined in body (thus reallocated at each loop). This is now the behavior in yaegi, so 1.21 produces
+// different results.
+var testsToSkipGo121 = map[string]bool{"cli6.go": true, "cli7.go": true, "issue-1276.go": true, "issue-1330.go": true, "struct11.go": true, "closure9.go": true, "closure10.go": true, "closure11.go": true, "closure12.go": true, "closure15.go": true, "closure16.go": true, "closure17.go": true, "closure18.go": true, "for17.go": true, "for18.go": true, "for19.go": true}
+
+var go121 = strings.HasPrefix(runtime.Version(), "go1.21")
+
 func TestFile(t *testing.T) {
 	filePath := "../_test/str.go"
 	runCheck(t, filePath)
 
-	defer func() {
-		_ = os.Setenv("YAEGI_SPECIAL_STDIO", "0")
-	}()
-	_ = os.Setenv("YAEGI_SPECIAL_STDIO", "1")
+	t.Setenv("YAEGI_SPECIAL_STDIO", "1")
 
 	baseDir := filepath.Join("..", "_test")
 	files, err := os.ReadDir(baseDir)
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	for _, file := range files {
 		if filepath.Ext(file.Name()) != ".go" {
+			continue
+		}
+		// Skip some tests which are problematic in go1.21 only.
+		if go121 && testsToSkipGo121[file.Name()] {
 			continue
 		}
 		file := file
@@ -79,7 +92,9 @@ func runCheck(t *testing.T, p string) {
 		t.Fatal(err)
 	}
 
-	if res := strings.TrimSpace(stdout.String()); res != wanted {
+	// Remove path in output, to have results independent of location.
+	re := regexp.MustCompile(p + ":")
+	if res := re.ReplaceAllString(strings.TrimSpace(stdout.String()), ""); res != wanted {
 		t.Errorf("\ngot:  %q,\nwant: %q", res, wanted)
 	}
 }
@@ -98,7 +113,7 @@ func wantedFromComment(p string) (res string, goPath string, err bool) {
 		if err != nil {
 			panic(err)
 		}
-		goPath = filepath.Join(wd, "../_test", strings.TrimPrefix(parts[0], "GOPATH:"))
+		goPath = filepath.Join(wd, "..", "_test", strings.TrimPrefix(parts[0], "GOPATH:"))
 	}
 	if strings.HasPrefix(text, "Output:\n") {
 		return strings.TrimPrefix(text, "Output:\n"), goPath, false

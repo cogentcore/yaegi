@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -38,7 +39,7 @@ func extractCmd(arg []string) error {
 
 	args := eflag.Args()
 	if len(args) == 0 {
-		return fmt.Errorf("missing package")
+		return errors.New("missing package")
 	}
 
 	license, err := genLicense(licensePath)
@@ -69,7 +70,7 @@ func extractCmd(arg []string) error {
 		ext.Include = strings.Split(include, ",")
 	}
 
-	r := strings.NewReplacer("/", "-", ".", "_")
+	r := strings.NewReplacer("/", "-", ".", "_", "~", "_")
 
 	for _, pkgIdent := range args {
 		var buf bytes.Buffer

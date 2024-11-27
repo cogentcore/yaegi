@@ -3,6 +3,7 @@ package interp
 import (
 	"errors"
 	"go/constant"
+	"go/token"
 	"math"
 	"reflect"
 )
@@ -124,6 +125,8 @@ func (check typecheck) starExpr(n *node) error {
 }
 
 var unaryOpPredicates = opPredicates{
+	aInc:    isNumber,
+	aDec:    isNumber,
 	aPos:    isNumber,
 	aNeg:    isNumber,
 	aBitNot: isInt,
@@ -133,6 +136,9 @@ var unaryOpPredicates = opPredicates{
 // unaryExpr type checks a unary expression.
 func (check typecheck) unaryExpr(n *node) error {
 	c0 := n.child[0]
+	if isBlank(c0) {
+		return n.cfgErrorf("cannot use _ as value")
+	}
 	t0 := c0.typ.TypeOf()
 
 	if n.action == aRecv {
@@ -178,25 +184,31 @@ func (check typecheck) shift(n *node) error {
 
 // comparison type checks a comparison binary expression.
 func (check typecheck) comparison(n *node) error {
-	c0, c1 := n.child[0], n.child[1]
+	t0, t1 := n.child[0].typ, n.child[1].typ
 
-	if !c0.typ.assignableTo(c1.typ) && !c1.typ.assignableTo(c0.typ) {
-		return n.cfgErrorf("invalid operation: mismatched types %s and %s", c0.typ.id(), c1.typ.id())
+	if !t0.assignableTo(t1) && !t1.assignableTo(t0) {
+		return n.cfgErrorf("invalid operation: mismatched types %s and %s", t0.id(), t1.id())
 	}
 
 	ok := false
+
+	if !isInterface(t0) && !isInterface(t1) && !t0.isNil() && !t1.isNil() && t0.untyped == t1.untyped && t0.id() != t1.id() && !typeDefined(t0, t1) {
+		// Non interface types must be really equals.
+		return n.cfgErrorf("invalid operation: mismatched types %s and %s", t0.id(), t1.id())
+	}
+
 	switch n.action {
 	case aEqual, aNotEqual:
-		ok = c0.typ.comparable() && c1.typ.comparable() || c0.typ.isNil() && c1.typ.hasNil() || c1.typ.isNil() && c0.typ.hasNil()
+		ok = t0.comparable() && t1.comparable() || t0.isNil() && t1.hasNil() || t1.isNil() && t0.hasNil()
 	case aLower, aLowerEqual, aGreater, aGreaterEqual:
-		ok = c0.typ.ordered() && c1.typ.ordered()
+		ok = t0.ordered() && t1.ordered()
 	}
 	if !ok {
-		typ := c0.typ
+		typ := t0
 		if typ.isNil() {
-			typ = c1.typ
+			typ = t1
 		}
-		return n.cfgErrorf("invalid operation: operator %v not defined on %s", n.action, typ.id(), ".")
+		return n.cfgErrorf("invalid operation: operator %v not defined on %s", n.action, typ.id())
 	}
 	return nil
 }
@@ -220,6 +232,10 @@ var binaryOpPredicates = opPredicates{
 // binaryExpr type checks a binary expression.
 func (check typecheck) binaryExpr(n *node) error {
 	c0, c1 := n.child[0], n.child[1]
+
+	if isBlank(c0) || isBlank(c1) {
+		return n.cfgErrorf("cannot use _ as value")
+	}
 
 	a := n.action
 	if isAssignAction(a) {
@@ -476,6 +492,12 @@ func (check typecheck) structBinLitExpr(child []*node, typ reflect.Type) error {
 
 // sliceExpr type checks a slice expression.
 func (check typecheck) sliceExpr(n *node) error {
+	for _, c := range n.child {
+		if isBlank(c) {
+			return n.cfgErrorf("cannot use _ as value")
+		}
+	}
+
 	c, child := n.child[0], n.child[1:]
 
 	t := c.typ.TypeOf()
@@ -568,7 +590,7 @@ func (check typecheck) typeAssertionExpr(n *node, typ *itype) error {
 	// https://github.com/golang/go/issues/39717 lands. It is currently impractical to
 	// type check Named types as they cannot be asserted.
 
-	if n.typ.TypeOf().Kind() != reflect.Interface {
+	if rt := n.typ.TypeOf(); rt.Kind() != reflect.Interface && rt != valueInterfaceType {
 		return n.cfgErrorf("invalid type assertion: non-interface type %s on left", n.typ.id())
 	}
 	ims := n.typ.methods()
@@ -591,10 +613,21 @@ func (check typecheck) typeAssertionExpr(n *node, typ *itype) error {
 			continue
 		}
 		if tm == nil {
+			// Lookup for non-exported methods is impossible
+			// for bin types, ignore them as they can't be used
+			// directly by the interpreted programs.
+			if !token.IsExported(name) && isBin(typ) {
+				continue
+			}
 			return n.cfgErrorf("impossible type assertion: %s does not implement %s (missing %v method)", typ.id(), n.typ.id(), name)
 		}
 		if tm.recv != nil && tm.recv.TypeOf().Kind() == reflect.Ptr && typ.TypeOf().Kind() != reflect.Ptr {
 			return n.cfgErrorf("impossible type assertion: %s does not implement %s as %q method has a pointer receiver", typ.id(), n.typ.id(), name)
+		}
+
+		if im.cat != funcT || tm.cat != funcT {
+			// It only makes sense to compare in/out parameter types if both types are functions.
+			continue
 		}
 
 		err := n.cfgErrorf("impossible type assertion: %s does not implement %s", typ.id(), n.typ.id())
@@ -690,21 +723,24 @@ var builtinFuncs = map[string]struct {
 	args     int
 	variadic bool
 }{
-	bltnAppend:  {args: 1, variadic: true},
-	bltnCap:     {args: 1, variadic: false},
-	bltnClose:   {args: 1, variadic: false},
-	bltnComplex: {args: 2, variadic: false},
-	bltnImag:    {args: 1, variadic: false},
-	bltnCopy:    {args: 2, variadic: false},
-	bltnDelete:  {args: 2, variadic: false},
-	bltnLen:     {args: 1, variadic: false},
-	bltnMake:    {args: 1, variadic: true},
-	bltnNew:     {args: 1, variadic: false},
-	bltnPanic:   {args: 1, variadic: false},
-	bltnPrint:   {args: 0, variadic: true},
-	bltnPrintln: {args: 0, variadic: true},
-	bltnReal:    {args: 1, variadic: false},
-	bltnRecover: {args: 0, variadic: false},
+	bltnAlignof:  {args: 1, variadic: false},
+	bltnAppend:   {args: 1, variadic: true},
+	bltnCap:      {args: 1, variadic: false},
+	bltnClose:    {args: 1, variadic: false},
+	bltnComplex:  {args: 2, variadic: false},
+	bltnImag:     {args: 1, variadic: false},
+	bltnCopy:     {args: 2, variadic: false},
+	bltnDelete:   {args: 2, variadic: false},
+	bltnLen:      {args: 1, variadic: false},
+	bltnMake:     {args: 1, variadic: true},
+	bltnNew:      {args: 1, variadic: false},
+	bltnOffsetof: {args: 1, variadic: false},
+	bltnPanic:    {args: 1, variadic: false},
+	bltnPrint:    {args: 0, variadic: true},
+	bltnPrintln:  {args: 0, variadic: true},
+	bltnReal:     {args: 1, variadic: false},
+	bltnRecover:  {args: 0, variadic: false},
+	bltnSizeof:   {args: 1, variadic: false},
 }
 
 func (check typecheck) builtin(name string, n *node, child []*node, ellipsis bool) error {
@@ -793,7 +829,7 @@ func (check typecheck) builtin(name string, n *node, child []*node, ellipsis boo
 		case !typ0.untyped && typ1.untyped:
 			err = check.convertUntyped(p1.nod, typ0)
 		case typ0.untyped && typ1.untyped:
-			fltType := check.scope.getType("float64")
+			fltType := untypedFloat(nil)
 			err = check.convertUntyped(p0.nod, fltType)
 			if err != nil {
 				break
@@ -816,7 +852,7 @@ func (check typecheck) builtin(name string, n *node, child []*node, ellipsis boo
 		p := params[0]
 		typ := p.Type()
 		if typ.untyped {
-			if err := check.convertUntyped(p.nod, check.scope.getType("complex128")); err != nil {
+			if err := check.convertUntyped(p.nod, untypedComplex(nil)); err != nil {
 				return err
 			}
 		}
@@ -894,7 +930,7 @@ func (check typecheck) builtin(name string, n *node, child []*node, ellipsis boo
 				return err
 			}
 		}
-	case bltnRecover, bltnNew:
+	case bltnRecover, bltnNew, bltnAlignof, bltnOffsetof, bltnSizeof:
 		// Nothing to do.
 	default:
 		return n.cfgErrorf("unsupported builtin %s", name)
@@ -931,6 +967,10 @@ func (check typecheck) arguments(n *node, child []*node, fun *node, ellipsis boo
 		}
 	}
 
+	if fun.typ == nil {
+		err := fun.cfgErrorf("typecheck arguments: nil function type: likely a syntax error above this point")
+		return err
+	}
 	var cnt int
 	for i, param := range params {
 		ellip := i == l-1 && ellipsis
@@ -1059,6 +1099,9 @@ func (check typecheck) convertUntyped(n *node, typ *itype) error {
 		if !n.typ.isNil() {
 			return convErr
 		}
+		return nil
+	case n.typ.isNil() && typ.id() == "unsafe.Pointer":
+		n.typ = typ
 		return nil
 	default:
 		return convErr

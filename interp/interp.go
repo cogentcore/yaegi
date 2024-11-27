@@ -4,16 +4,12 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"flag"
 	"fmt"
 	"go/build"
-	"go/constant"
 	"go/scanner"
 	"go/token"
 	"io"
 	"io/fs"
-	"log"
-	"math/bits"
 	"os"
 	"os/signal"
 	"path"
@@ -29,33 +25,34 @@ import (
 
 // Interpreter node structure for AST and CFG.
 type node struct {
-	debug  *nodeDebugData // debug info
-	child  []*node        // child subtrees (AST)
-	anc    *node          // ancestor (AST)
-	start  *node          // entry point in subtree (CFG)
-	tnext  *node          // true branch successor (CFG)
-	fnext  *node          // false branch successor (CFG)
-	interp *Interpreter   // interpreter context
-	frame  *frame         // frame pointer used for closures only (TODO: suppress this)
-	index  int64          // node index (dot display)
-	findex int            // index of value in frame or frame size (func def, type def)
-	level  int            // number of frame indirections to access value
-	nleft  int            // number of children in left part (assign) or indicates preceding type (compositeLit)
-	nright int            // number of children in right part (assign)
-	kind   nkind          // kind of node
-	pos    token.Pos      // position in source code, relative to fset
-	sym    *symbol        // associated symbol
-	typ    *itype         // type of value in frame, or nil
-	recv   *receiver      // method receiver node for call, or nil
-	types  []reflect.Type // frame types, used by function literals only
-	scope  *scope         // frame scope
-	action action         // action
-	exec   bltn           // generated function to execute
-	gen    bltnGenerator  // generator function to produce above bltn
-	val    interface{}    // static generic value (CFG execution)
-	rval   reflect.Value  // reflection value to let runtime access interpreter (CFG)
-	ident  string         // set if node is a var or func
-	meta   interface{}    // meta stores meta information between gta runs, like errors
+	debug      *nodeDebugData // debug info
+	child      []*node        // child subtrees (AST)
+	anc        *node          // ancestor (AST)
+	param      []*itype       // generic parameter nodes (AST)
+	start      *node          // entry point in subtree (CFG)
+	tnext      *node          // true branch successor (CFG)
+	fnext      *node          // false branch successor (CFG)
+	interp     *Interpreter   // interpreter context
+	index      int64          // node index (dot display)
+	findex     int            // index of value in frame or frame size (func def, type def)
+	level      int            // number of frame indirections to access value
+	nleft      int            // number of children in left part (assign) or indicates preceding type (compositeLit)
+	nright     int            // number of children in right part (assign)
+	kind       nkind          // kind of node
+	pos        token.Pos      // position in source code, relative to fset
+	sym        *symbol        // associated symbol
+	typ        *itype         // type of value in frame, or nil
+	recv       *receiver      // method receiver node for call, or nil
+	types      []reflect.Type // frame types, used by function literals only
+	scope      *scope         // frame scope
+	action     action         // action
+	exec       bltn           // generated function to execute
+	gen        bltnGenerator  // generator function to produce above bltn
+	val        interface{}    // static generic value (CFG execution)
+	rval       reflect.Value  // reflection value to let runtime access interpreter (CFG)
+	ident      string         // set if node is a var or func
+	redeclared bool           // set if node is a redeclared variable (CFG)
+	meta       interface{}    // meta stores meta information between gta runs, like errors
 }
 
 func (n *node) shouldBreak() bool {
@@ -108,7 +105,7 @@ type receiver struct {
 type frame struct {
 	// id is an atomic counter used for cancellation, only accessed
 	// via newFrame/runid/setrunid/clone.
-	// Located at start of struct to ensure proper aligment.
+	// Located at start of struct to ensure proper alignment.
 	id uint64
 
 	debug *frameDebugData
@@ -140,7 +137,7 @@ func newFrame(anc *frame, length int, id uint64) *frame {
 
 func (f *frame) runid() uint64      { return atomic.LoadUint64(&f.id) }
 func (f *frame) setrunid(id uint64) { atomic.StoreUint64(&f.id, id) }
-func (f *frame) clone(fork bool) *frame {
+func (f *frame) clone() *frame {
 	f.mutex.RLock()
 	defer f.mutex.RUnlock()
 	nf := &frame{
@@ -152,12 +149,8 @@ func (f *frame) clone(fork bool) *frame {
 		done:      f.done,
 		debug:     f.debug,
 	}
-	if fork {
-		nf.data = make([]reflect.Value, len(f.data))
-		copy(nf.data, f.data)
-	} else {
-		nf.data = f.data
-	}
+	nf.data = make([]reflect.Value, len(f.data))
+	copy(nf.data, f.data)
 	return nf
 }
 
@@ -186,14 +179,14 @@ type opt struct {
 	noRun        bool              // compile, but do not run
 	fastChan     bool              // disable cancellable chan operations
 	specialStdio bool              // allows os.Stdin, os.Stdout, os.Stderr to not be file descriptors
-	unrestricted bool              // allow use of non sandboxed symbols
+	unrestricted bool              // allow use of non-sandboxed symbols
 }
 
 // Interpreter contains global resources and state.
 type Interpreter struct {
-	// id is an atomic counter counter used for run cancellation,
+	// id is an atomic counter used for run cancellation,
 	// only accessed via runid/stop
-	// Located at start of struct to ensure proper alignment on 32 bit
+	// Located at start of struct to ensure proper alignment on 32-bit
 	// architectures.
 	id uint64
 
@@ -204,11 +197,12 @@ type Interpreter struct {
 
 	name string // name of the input source file (or main)
 
-	opt                        // user settable options
-	cancelChan bool            // enables cancellable chan operations
-	fset       *token.FileSet  // fileset to locate node in source code
-	binPkg     Exports         // binary packages used in interpreter, indexed by path
-	rdir       map[string]bool // for src import cycle detection
+	opt                                         // user settable options
+	cancelChan bool                             // enables cancellable chan operations
+	fset       *token.FileSet                   // fileset to locate node in source code
+	binPkg     Exports                          // binary packages used in interpreter, indexed by path
+	rdir       map[string]bool                  // for src import cycle detection
+	mapTypes   map[reflect.Value][]reflect.Type // special interfaces mapping for wrappers
 
 	mutex    sync.RWMutex
 	frame    *frame            // program data storage during execution
@@ -218,6 +212,7 @@ type Interpreter struct {
 	pkgNames map[string]string // package names, indexed by import path
 	done     chan struct{}     // for cancellation of channel operations
 	roots    []*node
+	generic  map[string]*node
 
 	hooks *hooks // symbol hooks
 
@@ -318,12 +313,14 @@ func New(options Options) *Interpreter {
 		universe: initUniverse(),
 		scopes:   map[string]*scope{},
 		binPkg:   Exports{"": map[string]reflect.Value{"_error": reflect.ValueOf((*_error)(nil))}},
+		mapTypes: map[reflect.Value][]reflect.Type{},
 		srcPkg:   imports{},
 		pkgNames: map[string]string{},
 		rdir:     map[string]bool{},
 		hooks:    &hooks{},
 		calls:    map[uintptr]*node{},
 		panics:   []*Panic{},
+		generic:  map[string]*node{},
 	}
 
 	if i.opt.stdin = options.Stdin; i.opt.stdin == nil {
@@ -390,28 +387,33 @@ func New(options Options) *Interpreter {
 }
 
 const (
-	bltnAppend  = "append"
-	bltnCap     = "cap"
-	bltnClose   = "close"
-	bltnComplex = "complex"
-	bltnImag    = "imag"
-	bltnCopy    = "copy"
-	bltnDelete  = "delete"
-	bltnLen     = "len"
-	bltnMake    = "make"
-	bltnNew     = "new"
-	bltnPanic   = "panic"
-	bltnPrint   = "print"
-	bltnPrintln = "println"
-	bltnReal    = "real"
-	bltnRecover = "recover"
+	bltnAlignof  = "unsafe.Alignof"
+	bltnAppend   = "append"
+	bltnCap      = "cap"
+	bltnClose    = "close"
+	bltnComplex  = "complex"
+	bltnImag     = "imag"
+	bltnCopy     = "copy"
+	bltnDelete   = "delete"
+	bltnLen      = "len"
+	bltnMake     = "make"
+	bltnNew      = "new"
+	bltnOffsetof = "unsafe.Offsetof"
+	bltnPanic    = "panic"
+	bltnPrint    = "print"
+	bltnPrintln  = "println"
+	bltnReal     = "real"
+	bltnRecover  = "recover"
+	bltnSizeof   = "unsafe.Sizeof"
 )
 
 func initUniverse() *scope {
 	sc := &scope{global: true, sym: map[string]*symbol{
 		// predefined Go types
+		"any":         {kind: typeSym, typ: &itype{cat: interfaceT, str: "any"}},
 		"bool":        {kind: typeSym, typ: &itype{cat: boolT, name: "bool", str: "bool"}},
 		"byte":        {kind: typeSym, typ: &itype{cat: uint8T, name: "uint8", str: "uint8"}},
+		"comparable":  {kind: typeSym, typ: &itype{cat: comparableT, name: "comparable", str: "comparable"}},
 		"complex64":   {kind: typeSym, typ: &itype{cat: complex64T, name: "complex64", str: "complex64"}},
 		"complex128":  {kind: typeSym, typ: &itype{cat: complex128T, name: "complex128", str: "complex128"}},
 		"error":       {kind: typeSym, typ: &itype{cat: errorT, name: "error", str: "error"}},
@@ -433,9 +435,9 @@ func initUniverse() *scope {
 		"uintptr":     {kind: typeSym, typ: &itype{cat: uintptrT, name: "uintptr", str: "uintptr"}},
 
 		// predefined Go constants
-		"false": {kind: constSym, typ: untypedBool(), rval: reflect.ValueOf(false)},
-		"true":  {kind: constSym, typ: untypedBool(), rval: reflect.ValueOf(true)},
-		"iota":  {kind: constSym, typ: untypedInt()},
+		"false": {kind: constSym, typ: untypedBool(nil), rval: reflect.ValueOf(false)},
+		"true":  {kind: constSym, typ: untypedBool(nil), rval: reflect.ValueOf(true)},
+		"iota":  {kind: constSym, typ: untypedInt(nil)},
 
 		// predefined Go zero value
 		"nil": {typ: &itype{cat: nilT, untyped: true, str: "nil"}},
@@ -903,62 +905,6 @@ func (interp *Interpreter) EvalTest(path string) error {
 	return err
 }
 
-// Symbols returns a map of interpreter exported symbol values for the given
-// import path. If the argument is the empty string, all known symbols are
-// returned.
-func (interp *Interpreter) Symbols(importPath string) Exports {
-	m := map[string]map[string]reflect.Value{}
-	interp.mutex.RLock()
-	defer interp.mutex.RUnlock()
-
-	for k, v := range interp.srcPkg {
-		if importPath != "" && k != importPath {
-			continue
-		}
-		syms := map[string]reflect.Value{}
-		for n, s := range v {
-			if !canExport(n) {
-				// Skip private non-exported symbols.
-				continue
-			}
-			switch s.kind {
-			case constSym:
-				syms[n] = s.rval
-			case funcSym:
-				syms[n] = genFunctionWrapper(s.node)(interp.frame)
-			case varSym:
-				syms[n] = interp.frame.data[s.index]
-			case typeSym:
-				syms[n] = reflect.New(s.typ.TypeOf())
-			}
-		}
-
-		if len(syms) > 0 {
-			m[k] = syms
-		}
-
-		if importPath != "" {
-			return m
-		}
-	}
-
-	if importPath != "" && len(m) > 0 {
-		return m
-	}
-
-	for k, v := range interp.binPkg {
-		if importPath != "" && k != importPath {
-			continue
-		}
-		m[k] = v
-		if importPath != "" {
-			return m
-		}
-	}
-
-	return m
-}
-
 func isFile(filesystem fs.FS, path string) bool {
 	fi, err := fs.Stat(filesystem, path)
 	return err == nil && fi.Mode().IsRegular()
@@ -990,7 +936,14 @@ func (interp *Interpreter) EvalWithContext(ctx context.Context, src string) (ref
 
 	done := make(chan struct{})
 	go func() {
-		defer close(done)
+		defer func() {
+			if r := recover(); r != nil {
+				var pc [64]uintptr
+				n := runtime.Callers(1, pc[:])
+				err = Panic{Value: r, Callers: pc[:n], Stack: debug.Stack()}
+			}
+			close(done)
+		}()
 		v, err = interp.Eval(src)
 	}()
 
@@ -1012,143 +965,6 @@ func (interp *Interpreter) stop() {
 }
 
 func (interp *Interpreter) runid() uint64 { return atomic.LoadUint64(&interp.id) }
-
-// getWrapper returns the wrapper type of the corresponding interface, or nil if not found.
-func (interp *Interpreter) getWrapper(t reflect.Type) reflect.Type {
-	if p, ok := interp.binPkg[t.PkgPath()]; ok {
-		return p["_"+t.Name()].Type().Elem()
-	}
-	return nil
-}
-
-// Use loads binary runtime symbols in the interpreter context so
-// they can be used in interpreted code.
-func (interp *Interpreter) Use(values Exports) error {
-	for k, v := range values {
-		importPath := path.Dir(k)
-		packageName := path.Base(k)
-
-		if importPath == "." {
-			return fmt.Errorf("export path %[1]q is missing a package name; did you mean '%[1]s/%[1]s'?", k)
-		}
-
-		if importPath == selfPrefix {
-			interp.hooks.Parse(v)
-			continue
-		}
-
-		if interp.binPkg[importPath] == nil {
-			interp.binPkg[importPath] = make(map[string]reflect.Value)
-			interp.pkgNames[importPath] = packageName
-		}
-
-		for s, sym := range v {
-			interp.binPkg[importPath][s] = sym
-		}
-		if k == selfPath {
-			interp.binPkg[importPath]["Self"] = reflect.ValueOf(interp)
-		}
-	}
-
-	// Checks if input values correspond to stdlib packages by looking for one
-	// well known stdlib package path.
-	if _, ok := values["fmt/fmt"]; ok {
-		fixStdlib(interp)
-	}
-	return nil
-}
-
-// fixStdlib redefines interpreter stdlib symbols to use the standard input,
-// output and errror assigned to the interpreter. The changes are limited to
-// the interpreter only.
-// Note that it is possible to escape the virtualized stdio by
-// read/write directly to file descriptors 0, 1, 2.
-func fixStdlib(interp *Interpreter) {
-	p := interp.binPkg["fmt"]
-	if p == nil {
-		return
-	}
-
-	stdin, stdout, stderr := interp.stdin, interp.stdout, interp.stderr
-
-	p["Print"] = reflect.ValueOf(func(a ...interface{}) (n int, err error) { return fmt.Fprint(stdout, a...) })
-	p["Printf"] = reflect.ValueOf(func(f string, a ...interface{}) (n int, err error) { return fmt.Fprintf(stdout, f, a...) })
-	p["Println"] = reflect.ValueOf(func(a ...interface{}) (n int, err error) { return fmt.Fprintln(stdout, a...) })
-
-	p["Scan"] = reflect.ValueOf(func(a ...interface{}) (n int, err error) { return fmt.Fscan(stdin, a...) })
-	p["Scanf"] = reflect.ValueOf(func(f string, a ...interface{}) (n int, err error) { return fmt.Fscanf(stdin, f, a...) })
-	p["Scanln"] = reflect.ValueOf(func(a ...interface{}) (n int, err error) { return fmt.Fscanln(stdin, a...) })
-
-	if p = interp.binPkg["flag"]; p != nil {
-		c := flag.NewFlagSet(os.Args[0], flag.PanicOnError)
-		c.SetOutput(stderr)
-		p["CommandLine"] = reflect.ValueOf(&c).Elem()
-	}
-
-	if p = interp.binPkg["log"]; p != nil {
-		l := log.New(stderr, "", log.LstdFlags)
-		// Restrict Fatal symbols to panic instead of exit.
-		p["Fatal"] = reflect.ValueOf(l.Panic)
-		p["Fatalf"] = reflect.ValueOf(l.Panicf)
-		p["Fatalln"] = reflect.ValueOf(l.Panicln)
-
-		p["Flags"] = reflect.ValueOf(l.Flags)
-		p["Output"] = reflect.ValueOf(l.Output)
-		p["Panic"] = reflect.ValueOf(l.Panic)
-		p["Panicf"] = reflect.ValueOf(l.Panicf)
-		p["Panicln"] = reflect.ValueOf(l.Panicln)
-		p["Prefix"] = reflect.ValueOf(l.Prefix)
-		p["Print"] = reflect.ValueOf(l.Print)
-		p["Printf"] = reflect.ValueOf(l.Printf)
-		p["Println"] = reflect.ValueOf(l.Println)
-		p["SetFlags"] = reflect.ValueOf(l.SetFlags)
-		p["SetOutput"] = reflect.ValueOf(l.SetOutput)
-		p["SetPrefix"] = reflect.ValueOf(l.SetPrefix)
-		p["Writer"] = reflect.ValueOf(l.Writer)
-	}
-
-	if p = interp.binPkg["os"]; p != nil {
-		p["Args"] = reflect.ValueOf(&interp.args).Elem()
-		if interp.specialStdio {
-			// Inherit streams from interpreter even if they do not have a file descriptor.
-			p["Stdin"] = reflect.ValueOf(&stdin).Elem()
-			p["Stdout"] = reflect.ValueOf(&stdout).Elem()
-			p["Stderr"] = reflect.ValueOf(&stderr).Elem()
-		} else {
-			// Inherits streams from interpreter only if they have a file descriptor and preserve original type.
-			if s, ok := stdin.(*os.File); ok {
-				p["Stdin"] = reflect.ValueOf(&s).Elem()
-			}
-			if s, ok := stdout.(*os.File); ok {
-				p["Stdout"] = reflect.ValueOf(&s).Elem()
-			}
-			if s, ok := stderr.(*os.File); ok {
-				p["Stderr"] = reflect.ValueOf(&s).Elem()
-			}
-		}
-		if !interp.unrestricted {
-			// In restricted mode, scripts can only access to a passed virtualized env, and can not write the real one.
-			getenv := func(key string) string { return interp.env[key] }
-			p["Clearenv"] = reflect.ValueOf(func() { interp.env = map[string]string{} })
-			p["ExpandEnv"] = reflect.ValueOf(func(s string) string { return os.Expand(s, getenv) })
-			p["Getenv"] = reflect.ValueOf(getenv)
-			p["LookupEnv"] = reflect.ValueOf(func(key string) (s string, ok bool) { s, ok = interp.env[key]; return })
-			p["Setenv"] = reflect.ValueOf(func(key, value string) error { interp.env[key] = value; return nil })
-			p["Unsetenv"] = reflect.ValueOf(func(key string) error { delete(interp.env, key); return nil })
-			p["Environ"] = reflect.ValueOf(func() (a []string) {
-				for k, v := range interp.env {
-					a = append(a, k+"="+v)
-				}
-				return
-			})
-		}
-	}
-
-	if p = interp.binPkg["math/bits"]; p != nil {
-		// Do not trust extracted value maybe from another arch.
-		p["UintSize"] = reflect.ValueOf(constant.MakeInt64(bits.UintSize))
-	}
-}
 
 // ignoreScannerError returns true if the error from Go scanner can be safely ignored
 // to let the caller grab one more line before retrying to parse its input.
