@@ -2621,7 +2621,7 @@ func (n *node) isType(sc *scope) bool {
 	case identExpr:
 		sym, _, found := sc.lookup(n.ident)
 		if found {
-			return sym.kind == typeSym // definitive
+			return sym.kind == typeSym
 		}
 		// note: in case of generic functions, the type might not exist within
 		// the scope where the generic function was defined, so we
