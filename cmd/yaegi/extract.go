@@ -121,7 +121,7 @@ func genLicense(fname string) (string, error) {
 		}
 		license.WriteString("//" + txt + "\n")
 	}
-	if sc.Err() != nil {
+	if err := sc.Err(); err != nil {
 		return "", fmt.Errorf("could not scan LICENSE file: %w", err)
 	}
 

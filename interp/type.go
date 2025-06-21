@@ -733,10 +733,12 @@ func nodeType2(interp *Interpreter, sc *scope, n *node, seen []*node) (t *itype,
 			if err != nil {
 				return nil, err
 			}
-			for _, c := range arg.child[:cl] {
-				sc.sym[c.ident] = &symbol{index: -1, kind: varTypeSym, typ: typ}
+			if typ != nil {
+				for _, c := range arg.child[:cl] {
+					sc.sym[c.ident] = &symbol{index: -1, kind: varTypeSym, typ: typ}
+				}
+				incomplete = incomplete || typ.incomplete
 			}
-			incomplete = incomplete || typ.incomplete
 		}
 
 		// Handle input parameters.
@@ -747,12 +749,14 @@ func nodeType2(interp *Interpreter, sc *scope, n *node, seen []*node) (t *itype,
 			if err != nil {
 				return nil, err
 			}
-			args = append(args, typ)
-			// Several arguments may be factorized on the same field type.
-			for i := 1; i < cl; i++ {
+			if typ != nil {
 				args = append(args, typ)
+				// Several arguments may be factorized on the same field type.
+				for i := 1; i < cl; i++ {
+					args = append(args, typ)
+				}
+				incomplete = incomplete || typ.incomplete
 			}
-			incomplete = incomplete || typ.incomplete
 		}
 
 		// Handle returned values.
@@ -764,12 +768,14 @@ func nodeType2(interp *Interpreter, sc *scope, n *node, seen []*node) (t *itype,
 				if err != nil {
 					return nil, err
 				}
-				rets = append(rets, typ)
-				// Several arguments may be factorized on the same field type.
-				for i := 1; i < cl; i++ {
+				if typ != nil {
 					rets = append(rets, typ)
+					// Several arguments may be factorized on the same field type.
+					for i := 1; i < cl; i++ {
+						rets = append(rets, typ)
+					}
+					incomplete = incomplete || typ.incomplete
 				}
-				incomplete = incomplete || typ.incomplete
 			}
 		}
 		t = funcOf(args, rets, withNode(n), withScope(sc))
