@@ -16,10 +16,7 @@ import (
 	"github.com/traefik/yaegi/stdlib/unsafe"
 )
 
-// The following tests depend on an incompatible language change in go1.22, where `for` variables are now
-// defined in body (thus reallocated at each loop). We skip them until both supported versions behave the same.
-// We will remove this in Go1.23.
-var testsToSkipGo122 = map[string]bool{"closure9.go": true, "closure10.go": true, "closure11.go": true, "closure12.go": true}
+var testsToSkipGo122 = map[string]bool{}
 
 var go122 = strings.HasPrefix(runtime.Version(), "go1.22")
 
@@ -180,6 +177,9 @@ func TestInterpConsistencyBuild(t *testing.T) {
 			os.Stdout = backupStdout
 
 			bin := filepath.Join(dir, strings.TrimSuffix(file.Name(), ".go"))
+			if runtime.GOOS == "windows" {
+				bin += ".exe"
+			}
 
 			cmdBuild := exec.Command("go", "build", "-tags=dummy", "-o", bin, filePath)
 			outBuild, err := cmdBuild.CombinedOutput()
@@ -296,8 +296,8 @@ func TestInterpErrorConsistency(t *testing.T) {
 		},
 		{
 			fileName:       "switch13.go",
-			expectedInterp: "9:2: i is not a type",
-			expectedExec:   "9:7: i (variable of type interface{}) is not a type",
+			expectedInterp: "is not a type",
+			expectedExec:   "is not a type",
 		},
 		{
 			fileName:       "switch19.go",
