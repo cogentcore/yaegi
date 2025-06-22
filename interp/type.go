@@ -733,12 +733,10 @@ func nodeType2(interp *Interpreter, sc *scope, n *node, seen []*node) (t *itype,
 			if err != nil {
 				return nil, err
 			}
-			if typ != nil {
-				for _, c := range arg.child[:cl] {
-					sc.sym[c.ident] = &symbol{index: -1, kind: varTypeSym, typ: typ}
-				}
-				incomplete = incomplete || typ.incomplete
+			for _, c := range arg.child[:cl] {
+				sc.sym[c.ident] = &symbol{index: -1, kind: varTypeSym, typ: typ}
 			}
+			incomplete = incomplete || typ.incomplete
 		}
 
 		// Handle input parameters.
@@ -749,14 +747,12 @@ func nodeType2(interp *Interpreter, sc *scope, n *node, seen []*node) (t *itype,
 			if err != nil {
 				return nil, err
 			}
-			if typ != nil {
+			args = append(args, typ)
+			// Several arguments may be factorized on the same field type.
+			for i := 1; i < cl; i++ {
 				args = append(args, typ)
-				// Several arguments may be factorized on the same field type.
-				for i := 1; i < cl; i++ {
-					args = append(args, typ)
-				}
-				incomplete = incomplete || typ.incomplete
 			}
+			incomplete = incomplete || typ.incomplete
 		}
 
 		// Handle returned values.
@@ -768,14 +764,12 @@ func nodeType2(interp *Interpreter, sc *scope, n *node, seen []*node) (t *itype,
 				if err != nil {
 					return nil, err
 				}
-				if typ != nil {
+				rets = append(rets, typ)
+				// Several arguments may be factorized on the same field type.
+				for i := 1; i < cl; i++ {
 					rets = append(rets, typ)
-					// Several arguments may be factorized on the same field type.
-					for i := 1; i < cl; i++ {
-						rets = append(rets, typ)
-					}
-					incomplete = incomplete || typ.incomplete
 				}
+				incomplete = incomplete || typ.incomplete
 			}
 		}
 		t = funcOf(args, rets, withNode(n), withScope(sc))
@@ -981,7 +975,8 @@ func nodeType2(interp *Interpreter, sc *scope, n *node, seen []*node) (t *itype,
 			}
 		}
 
-		if lt.incomplete {
+		if lt.incomplete { // note: per #1700 this results in a nil type with no err
+			// but TestIssue1388 for #1388 triggers this, so not changing here.
 			break
 		}
 		name := n.child[1].ident
@@ -1124,6 +1119,7 @@ func nodeType2(interp *Interpreter, sc *scope, n *node, seen []*node) (t *itype,
 
 	switch {
 	case t == nil:
+		err = n.cfgErrorf("nil type (could be trying to use a generic type constraint interface?): %s", n.kind)
 	case t.name != "" && t.path != "":
 		t.str = t.path + "." + t.name
 	case t.cat == nilT:
