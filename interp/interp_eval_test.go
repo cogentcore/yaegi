@@ -1930,3 +1930,25 @@ func TestIssue1623(t *testing.T) {
 		{desc: `pkg.S = "bar"`, src: `pkg.S = "bar"; pkg.S`, res: "bar"},
 	})
 }
+
+func TestVarargCrashRandom(t *testing.T) {
+	type Node struct {
+	}
+	afunc := func(name string, parent ...*Node) (*Node, error) {
+		return nil, nil
+	}
+
+	i := interp.New(interp.Options{})
+	if err := i.Use(interp.Exports{
+		"pkg/pkg": map[string]reflect.Value{
+			"afunc": reflect.ValueOf(afunc),
+		},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	i.ImportUsed()
+
+	runTests(t, i, []testCase{
+		{desc: "afun", src: `n, _ := pkg.afunc("root")`, res: "<nil>"},
+	})
+}
