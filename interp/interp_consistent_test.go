@@ -11,9 +11,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cogentcore/yaegi/interp"
-	"github.com/cogentcore/yaegi/stdlib"
-	"github.com/cogentcore/yaegi/stdlib/unsafe"
+	"github.com/traefik/yaegi/interp"
+	"github.com/traefik/yaegi/stdlib"
+	"github.com/traefik/yaegi/stdlib/unsafe"
 )
 
 var testsToSkipGo122 = map[string]bool{}
@@ -42,6 +42,7 @@ func TestInterpConsistencyBuild(t *testing.T) {
 			file.Name() == "assign11.go" || // expect error
 			file.Name() == "assign12.go" || // expect error
 			file.Name() == "assign15.go" || // expect error
+			file.Name() == "assign19.go" || // expect error
 			file.Name() == "bad0.go" || // expect error
 			file.Name() == "break0.go" || // expect error
 			file.Name() == "cont3.go" || // expect error

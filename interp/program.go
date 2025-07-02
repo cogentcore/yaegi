@@ -7,8 +7,6 @@ import (
 	"io/fs"
 	"path/filepath"
 	"reflect"
-	"runtime"
-	"runtime/debug"
 )
 
 // A Program is Go code that has been parsed and compiled.
@@ -143,9 +141,8 @@ func (interp *Interpreter) Execute(p *Program) (res reflect.Value, err error) {
 	defer func() {
 		r := recover()
 		if r != nil {
-			var pc [64]uintptr // 64 frames should be enough.
-			n := runtime.Callers(1, pc[:])
-			err = Panic{Value: r, Callers: pc[:n], Stack: debug.Stack()}
+			interp.Panic(r)
+			err = interp.GetOldestPanicForErr(r)
 		}
 	}()
 	interp.id = 0 // restart fresh!

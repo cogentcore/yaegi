@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/cogentcore/yaegi/interp"
+	"github.com/traefik/yaegi/interp"
 )
 
 type Helloer interface {
