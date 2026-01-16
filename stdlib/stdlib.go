@@ -1,4 +1,4 @@
-//go:build go1.21
+//go:build go1.25
 
 // Package stdlib provides wrappers of standard library packages to be imported natively in Yaegi.
 package stdlib
