@@ -1,4 +1,4 @@
-//go:build go1.25
+//go:build go1.27
 
 // Package stdlib provides wrappers of standard library packages to be imported natively in Yaegi.
 package stdlib
@@ -37,6 +37,7 @@ func init() {
 //go:generate ../internal/cmd/extract/extract encoding encoding/ascii85 encoding/asn1 encoding/base32
 //go:generate ../internal/cmd/extract/extract encoding/base64 encoding/binary encoding/csv encoding/gob
 //go:generate ../internal/cmd/extract/extract encoding/hex encoding/json encoding/pem encoding/xml
+//go:generate ../internal/cmd/extract/extract encoding/hex encoding/json/v2 encoding/pem encoding/xml
 //go:generate ../internal/cmd/extract/extract errors expvar flag fmt
 //go:generate ../internal/cmd/extract/extract go/ast go/build go/build/constraint go/constant go/doc go/doc/comment go/format
 //go:generate ../internal/cmd/extract/extract go/importer go/parser go/printer go/scanner go/token go/types

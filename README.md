@@ -1,7 +1,6 @@
 <p align="center">
 <img width="400" src="doc/images/yaegi.png" alt="Yaegi" title="Yaegi" />
 </p>
-
 [![release](https://img.shields.io/github/tag-date/traefik/yaegi.svg?label=alpha)](https://github.com/cogentcore/yaegi/releases)
 [![Build Status](https://github.com/cogentcore/yaegi/actions/workflows/main.yml/badge.svg)](https://github.com/cogentcore/yaegi/actions/workflows/main.yml)
 [![GoDoc](https://godoc.org/github.com/cogentcore/yaegi?status.svg)](https://pkg.go.dev/mod/github.com/cogentcore/yaegi)
@@ -9,15 +8,20 @@
 Yaegi is Another Elegant Go Interpreter.
 It powers executable Go scripts and plugins, in embedded interpreters or interactive shells, on top of the Go runtime.
 
+## Cogent Core version
+
+This is a fork of the original: https://github.com/traefik/yaegi/interp with several PRs applied that have not been merged upstream.
+
+Yaegi is basically in maintenance mode, with https://github.com/mvm-sh/mvm being the replacement, which Cogent Core will be switching over to soon.
+
 ## Features
 
-* Complete support of [Go specification][specs], up to Go v1.22
+* Complete support of [Go specification][specs], up to Go v1.27
 * Written in pure Go, using only the standard library
 * Simple interpreter API: `New()`, `Eval()`, `Use()`
 * Works everywhere Go works
 * All Go & runtime resources accessible from script (with control)
 * Security: `unsafe` and `syscall` packages neither used nor exported by default
-* Support the latest 2 major releases of Go (Go 1.21 and Go 1.22)
 
 ## Install
 

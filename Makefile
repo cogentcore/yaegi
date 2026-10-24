@@ -2,7 +2,7 @@
 check:
 	golangci-lint run
 
-# Generate stdlib/syscall/syscall_GOOS_GOARCH.go for all platforms
+# Generate stdlib/syscall/syscall_GOOS_GOARCH.go mfor all platforms
 gen_all_syscall: internal/cmd/extract/extract
 	@for v in $$(go tool dist list); do \
 		echo syscall_$${v%/*}_$${v#*/}.go; \
